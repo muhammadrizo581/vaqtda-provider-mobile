@@ -12,7 +12,8 @@ import {
   X,
 } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { AnimatedLogo } from "@/components/animated-logo";
 import { BusinessGate } from "@/components/pv/business-gate";
 import { Screen } from "@/components/pv/screen";
 import {
@@ -198,7 +199,7 @@ function OverviewContent() {
               {a.status === "upcoming" &&
                 (actingId === a.id ? (
                   <View style={{ alignItems: "center", paddingVertical: 4 }}>
-                    <ActivityIndicator size="small" color={colors.primary} />
+                    <AnimatedLogo variant="loading" size={20} background={null} foreground={colors.primary} />
                   </View>
                 ) : (
                   <View style={styles.apptActions}>

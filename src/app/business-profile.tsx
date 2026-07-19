@@ -7,7 +7,6 @@ import { useRouter } from "expo-router";
 import { ArrowLeft, Camera, Star, X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -19,6 +18,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AnimatedLogo } from "@/components/animated-logo";
 import { LocationPicker } from "@/components/pv/location-picker";
 import { SelectField } from "@/components/pv/select-field";
 import { useToast } from "@/components/pv/toast";
@@ -35,6 +35,8 @@ interface PickedImage {
   uri: string;
   mimeType: string;
   is_primary: boolean;
+  /** business_images jadvalidagi id — avval yuklangan rasmlar uchun */
+  existingId?: string;
 }
 
 // +998 (XX) XXX XX XX ko'rinishida formatlash (web'dagi IMask o'rnida)
@@ -71,6 +73,8 @@ export default function BusinessProfileScreen() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [mapCoordinates, setMapCoordinates] = useState<[number, number]>([41.2995, 69.2401]);
   const [images, setImages] = useState<PickedImage[]>([]);
+  // O'chirilgan mavjud rasmlar — saqlashda DB/storage'dan olib tashlanadi
+  const [removedExisting, setRemovedExisting] = useState<{ id: string; uri: string }[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -116,6 +120,32 @@ export default function BusinessProfileScreen() {
     return () => clearTimeout(t);
   }, [provider]);
 
+  // Avval yuklangan rasmlarni ko'rsatamiz (EDIT rejimi)
+  useEffect(() => {
+    if (!editId) return;
+    (async () => {
+      const { data } = await supabase
+        .from("business_images")
+        .select("id, image_url, is_primary")
+        .eq("provider_id", editId)
+        .order("is_primary", { ascending: false });
+      if (!data) return;
+      setImages((prev) =>
+        prev.some((p) => p.existingId)
+          ? prev
+          : [
+              ...data.map((d) => ({
+                uri: d.image_url as string,
+                mimeType: "",
+                is_primary: !!d.is_primary,
+                existingId: d.id as string,
+              })),
+              ...prev,
+            ]
+      );
+    })();
+  }, [editId]);
+
   const pickImages = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
@@ -142,6 +172,9 @@ export default function BusinessProfileScreen() {
   const removeImage = (idx: number) =>
     setImages((prev) => {
       const removed = prev[idx];
+      if (removed?.existingId) {
+        setRemovedExisting((r) => [...r, { id: removed.existingId!, uri: removed.uri }]);
+      }
       const filtered = prev.filter((_, i) => i !== idx);
       if (removed?.is_primary && filtered.length > 0) filtered[0].is_primary = true;
       return filtered;
@@ -204,10 +237,44 @@ export default function BusinessProfileScreen() {
         providerId = data.id;
       }
 
-      // Rasmlarni storage'ga yuklab, business_images jadvaliga yozamiz
-      for (let i = 0; i < images.length; i++) {
-        const img = images[i];
-        setStatus(`${t("common.loading")} (${i + 1}/${images.length})`);
+      // O'chirilgan mavjud rasmlarni DB va storage'dan olib tashlaymiz
+      if (removedExisting.length > 0) {
+        await supabase
+          .from("business_images")
+          .delete()
+          .in(
+            "id",
+            removedExisting.map((r) => r.id)
+          );
+        // Storage'dan tozalash — best-effort, xato bo'lsa saqlashni to'xtatmaymiz
+        try {
+          const paths = removedExisting
+            .map((r) => decodeURIComponent(r.uri.split("/business_images/")[1] || ""))
+            .filter(Boolean);
+          if (paths.length > 0) {
+            await supabase.storage.from("business_images").remove(paths);
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+
+      // Mavjud rasmlarning "asosiy" belgisi o'zgargan bo'lishi mumkin
+      for (const img of images.filter((i) => i.existingId)) {
+        await supabase
+          .from("business_images")
+          .update({ is_primary: img.is_primary })
+          .eq("id", img.existingId!);
+        if (img.is_primary) {
+          await supabase.from("providers").update({ avatar_url: img.uri }).eq("id", providerId);
+        }
+      }
+
+      // Yangi rasmlarni storage'ga yuklab, business_images jadvaliga yozamiz
+      const newImages = images.filter((i) => !i.existingId);
+      for (let i = 0; i < newImages.length; i++) {
+        const img = newImages[i];
+        setStatus(`${t("common.loading")} (${i + 1}/${newImages.length})`);
         const ext = img.mimeType.split("/")[1] || "jpg";
         const filePath = `${user.id}/${Date.now()}-${i}.${ext}`;
 
@@ -376,7 +443,7 @@ export default function BusinessProfileScreen() {
         {/* Yuborish */}
         {submitting ? (
           <View style={styles.submitting}>
-            <ActivityIndicator color={colors.primary} />
+            <AnimatedLogo variant="loading" size={48} />
             {status ? <Text style={styles.submittingText}>{status}</Text> : null}
           </View>
         ) : (

@@ -3,7 +3,7 @@ import { GlassView, isLiquidGlassAvailable } from "expo-glass-effect";
 import { Image } from "expo-image";
 import type { LucideIcon } from "lucide-react-native";
 import React from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Switch, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Platform, Pressable, StyleSheet, Switch, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { AnimatedLogo } from "@/components/animated-logo";
 import { alpha, colors, radius, toneColors, type BadgeTone, type Tone } from "@/constants/colors";
 
@@ -184,7 +184,7 @@ export function EmptyState({
 export function Spinner({ style }: { style?: StyleProp<ViewStyle> }) {
   return (
     <View style={[{ alignItems: "center", justifyContent: "center", paddingVertical: 48 }, style]}>
-      <AnimatedLogo variant="loading" size={64} background={null} />
+      <AnimatedLogo variant="loading" size={56} />
     </View>
   );
 }
@@ -305,7 +305,7 @@ export function SmallButton({
           style={styles.smallBtnGlass}
         >
           {loading ? (
-            <ActivityIndicator size="small" color={fg} />
+            <AnimatedLogo variant="loading" size={18} background={null} foreground={fg} />
           ) : (
             <>
               {Icon ? <Icon size={14} color={fg} /> : null}
@@ -329,7 +329,7 @@ export function SmallButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={fg} />
+        <AnimatedLogo variant="loading" size={18} background={null} foreground={fg} />
       ) : (
         <>
           {Icon ? <Icon size={14} color={fg} /> : null}

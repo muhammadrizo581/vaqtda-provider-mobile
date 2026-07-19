@@ -3,7 +3,6 @@ import { Image } from "expo-image";
 import { Lock, Mail } from "lucide-react-native";
 import React, { useState } from "react";
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AnimatedLogo } from "@/components/animated-logo";
 import { FilterPill, GlassSurface, liquidGlass } from "@/components/pv/ui";
 import { alpha, colors, radius } from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
@@ -60,9 +60,9 @@ export default function LoginScreen() {
         <View style={styles.logoWrap}>
           <View style={styles.logoBox}>
             <Image
-              source={require("@/assets/images/logo.png")}
+              source={require("@/assets/images/icon.png")}
               style={{ width: 80, height: 80 }}
-              contentFit="cover"
+              contentFit="contain"
             />
           </View>
           <Text style={styles.title}>Vaqtda Provider</Text>
@@ -123,7 +123,7 @@ export default function LoginScreen() {
                 ]}
               >
                 {pending ? (
-                  <ActivityIndicator size="small" color={colors.onPrimary} />
+                  <AnimatedLogo variant="loading" size={20} background={null} foreground={colors.onPrimary} />
                 ) : (
                   <Text style={styles.submitText}>{t("auth.login")}</Text>
                 )}

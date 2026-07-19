@@ -9,7 +9,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, ImagePlus, MessageCircle, Send } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -21,6 +20,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AnimatedLogo } from "@/components/animated-logo";
 import { useToast } from "@/components/pv/toast";
 import { ClientAvatar, GlassSurface, liquidGlass, Spinner } from "@/components/pv/ui";
 import { alpha, colors } from "@/constants/colors";
@@ -364,7 +364,7 @@ export default function ChatThreadScreen() {
           <GlassSurface style={styles.attachGlass} fallbackStyle={styles.attachFallback} interactive>
             <Pressable onPress={pickImage} disabled={uploading} style={styles.circleInner}>
               {uploading ? (
-                <ActivityIndicator size="small" color={colors.primary} />
+                <AnimatedLogo variant="loading" size={19} background={null} foreground={colors.primary} />
               ) : (
                 <ImagePlus size={19} color={colors.onSurfaceVariant} />
               )}
@@ -393,7 +393,7 @@ export default function ChatThreadScreen() {
               style={[styles.circleInner, (!body.trim() || sending) && { opacity: 0.5 }]}
             >
               {sending ? (
-                <ActivityIndicator size="small" color={colors.onPrimary} />
+                <AnimatedLogo variant="loading" size={17} background={null} foreground={colors.onPrimary} />
               ) : (
                 <Send
                   size={17}

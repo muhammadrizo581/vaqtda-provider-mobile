@@ -8,6 +8,7 @@ import { StyleSheet, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AnimatedLogo } from "@/components/animated-logo";
 import { ToastProvider } from "@/components/pv/toast";
+import { VaqtdaSplash } from "@/components/vaqtda-splash";
 import { colors } from "@/constants/colors";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { LanguageProvider } from "@/context/LanguageContext";
@@ -52,17 +53,16 @@ function RootNavigator() {
         </Stack>
       )}
 
-      {/* Kirish intro'si: bir marta o'ynaydi; agar auth hali yuklanayotgan
-          bo'lsa, intro tugagach loading variantga o'tib kutib turadi */}
-      {showOverlay && (
-        <View style={styles.introOverlay}>
-          {introDone ? (
-            <AnimatedLogo variant="loading" size={120} background={null} />
-          ) : (
-            <AnimatedLogo variant="intro" size={160} background={null} onFinish={() => setIntroDone(true)} />
-          )}
-        </View>
-      )}
+      {/* Kirish intro'si: brend splash bir marta o'ynaydi; agar auth hali
+          yuklanayotgan bo'lsa, splash tugagach shimmer-loader kutib turadi */}
+      {showOverlay &&
+        (introDone ? (
+          <View style={styles.introOverlay}>
+            <AnimatedLogo variant="loading" size={100} />
+          </View>
+        ) : (
+          <VaqtdaSplash onDone={() => setIntroDone(true)} />
+        ))}
     </View>
   );
 }

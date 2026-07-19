@@ -1,13 +1,14 @@
-// Vaqtda logotipining animatsion versiyasi.
+// Vaqtda logo — yaproqli (marquise) belgi + galochka, yashil kvadrat fonda.
+// Claude artifact "Vaqtda — logo animatsiyasi" dan birebir port (viewBox 0 0 200 200).
 //
-// variant="intro" (default) — ilovaga kirganda bir marta o'ynaydi (~2s):
-//   0–0.9s  yaproqlar TO'LIQ OQ holicha ketma-ket paydo bo'lib, soat
-//           yo'nalishida bitta aylana yasaydi — to'lgani to'la turadi
-//   1.0–1.26s yaproqlar konturga qaytadi, faqat chap-yuqori (to'la) yaproq
-//           to'la qoladi — logotipning asl holati
-//   1.12–1.64s galochka stroke bo'ylab chiziladi
-//   1.48–1.98s butun logo yengil puls qiladi
-// variant="loading" — xuddi shu aylanma to'lish, lekin cheksiz; yuklanish holatlari uchun.
+// Variantlar:
+//   "intro"   — fon kvadrati kirib keladi, yaproqlar soat 12 dan boshlab har 110ms da
+//               TO'LIQ OQ holicha paydo bo'ladi (bitta aylana); 1.0–1.26s da konturga
+//               "bo'shashadi" (faqat chap-yuqori yaproq to'la qoladi — logotipning asl
+//               holati), galochka chiziladi, butun logo bir puls qiladi (~1.98s),
+//               tugagach onFinish chaqiriladi
+//   "loading" — cheksiz aylanish (1.28s sikl): har 160ms da keyingi yaproq to'lib
+//               "pop" qiladi va orqasidan so'nadi — brend loaderi
 import React, { useEffect } from "react";
 import Animated, {
   cancelAnimation,
@@ -16,7 +17,6 @@ import Animated, {
   interpolate,
   runOnJS,
   useAnimatedProps,
-  useAnimatedStyle,
   useSharedValue,
   withRepeat,
   withTiming,
@@ -26,105 +26,126 @@ import Svg, { G, Path, Rect } from "react-native-svg";
 
 const AnimatedG = Animated.createAnimatedComponent(G);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
+const AnimatedRect = Animated.createAnimatedComponent(Rect);
 
 type Variant = "intro" | "loading";
 
-// Intro taymlayni (ms): STEP — yaproqdan yaproqqa o'tish, bitta aylana = 8 qadam
-const STEP = 110;
-const RELEASE_START = 1000; // yaproqlar konturga qaytishni boshlaydi
-const RELEASE_END = 1260;
-const CHECK_START = 1120;
-const CHECK_END = 1640;
-const PULSE_PEAK = 1780;
-const INTRO_TOTAL = 1980;
-// Loading: to'liq aylana davomiyligi (ms)
-const SPIN_CYCLE = 1280;
-
-// Bitta yaproq (marquise) — ichki uchi (0,0) da, tepaga qaragan.
-// Ichki uch markazdan 36px da turadi (galochkaga tegmasligi uchun).
-const LEAF_PATH = "M0 0 C 9 -7, 10 -24, 0 -34 C -10 -24, -9 -7, 0 0 Z";
-const LEAF_INNER_R = 64; // translate(100, 100 - 36)
-// Galochka uzunligi ~74 — dash-offset chizish uchun
+// Belgi geometriyasi (viewBox 0 0 200 200, markaz 100,100)
+// Yaproq: ichki uchi (0,0) da, tepaga qaragan; markazdan 36px da joylashtiriladi
+const LEAF = "M0 0 C 9 -7, 10 -24, 0 -34 C -10 -24, -9 -7, 0 0 Z";
+const CHECK = "M74 100 L90 118 L122 80";
 const CHECK_LEN = 75;
-const CHECK_PATH = "M74 100 L90 118 L122 80";
-// Soat yo'nalishida: 0° tepada, 315° — to'la yaproq (aylanish shunda tugaydi)
+const CHECK_WIDTH = 7;
+const LEAF_STROKE = 5;
+// Soat yo'nalishida: 0=tepada (12), 315=chap-yuqori — logotipda to'la qoladigan yaproq
 const ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
+const FILLED_INDEX = 7; // 315°
+
+// Intro taymlayni (artifact: TOTAL=1980ms)
+const INTRO_TOTAL = 1980;
+const LEAF_STEP = 110; // yaproq i — i*110ms da paydo bo'ladi
+const POP_UP = 230; // scale 0→1.12
+const POP_SETTLE = 350; // →1
+const REL_S = 1000; // "bo'shash": to'liq holatdan konturga qaytish
+const REL_E = 1260;
+const BG_DUR = 450; // fon: scale .85→1, xiralikdan chiqish
+const CHECK_START = 1120;
+const CHECK_DUR = 520;
+const PULSE_START = 1480;
+const PULSE_DUR = 500;
+// Loading (artifact: 1280ms sikl, yaproqlar orasida 160ms)
+const LOAD_CYCLE = 1280;
+const LOAD_STAGGER = 160 / LOAD_CYCLE;
+const LOAD_POP = 0.14; // siklning boshida scale 1.1→1
+
+// Brend ranglari (artifact: --brand / --brand-deep)
+export const BRAND_GREEN = "#0E8F6D";
+export const BRAND_GREEN_DEEP = "#0B7458";
 
 function Leaf({
-  angle,
   index,
   t,
   color,
   variant,
 }: {
-  angle: number;
   index: number;
   t: SharedValue<number>;
   color: string;
   variant: Variant;
 }) {
-  const filled = angle === 315;
+  const stays = index === FILLED_INDEX;
 
-  const props = useAnimatedProps(() => {
+  // Yaproq to'lishi (fill-opacity) — kontur (stroke) doim qoladi
+  const fillProps = useAnimatedProps(() => {
     if (variant === "loading") {
-      // phase: 0 — "bosh" shu yaproqda (to'la), 1 ga qarab so'nadi
-      const phase = (((t.value - index / 8) % 1) + 1) % 1;
-      return {
-        scale: 1 + 0.09 * Math.max(0, 1 - phase * 6),
-        fillOpacity: Math.pow(1 - phase, 1.4),
-      };
+      const phase = (((t.value - index * LOAD_STAGGER) % 1) + 1) % 1;
+      return { fillOpacity: 1 - phase };
     }
-    // Intro: yaproq i i*STEP da TO'LIQ OQ holicha paydo bo'ladi va shu holicha
-    // turadi; aylana to'lgach (RELEASE) konturga qaytadi, to'la yaproq qoladi
     const ms = t.value * INTRO_TOTAL;
-    const appear = index * STEP;
-    let fill = 0;
-    if (ms >= appear) {
-      fill = filled
-        ? 1
-        : 1 - interpolate(ms, [RELEASE_START, RELEASE_END], [0, 1], Extrapolation.CLAMP);
+    const t0 = index * LEAF_STEP;
+    let fill = interpolate(ms, [t0, t0 + 10], [0, 1], Extrapolation.CLAMP);
+    if (!stays) fill *= 1 - interpolate(ms, [REL_S, REL_E], [0, 1], Extrapolation.CLAMP);
+    return { fillOpacity: fill };
+  });
+
+  // Yaproq masshtabi — ichki uchi (markaz tomoni) atrofida
+  const scaleProps = useAnimatedProps(() => {
+    if (variant === "loading") {
+      const phase = (((t.value - index * LOAD_STAGGER) % 1) + 1) % 1;
+      return { scale: interpolate(phase, [0, LOAD_POP], [1.1, 1], Extrapolation.CLAMP) };
     }
+    const ms = t.value * INTRO_TOTAL;
+    const t0 = index * LEAF_STEP;
     return {
-      // Paydo bo'lish overshoot bilan, fill bilan bir vaqtda
-      scale: interpolate(ms, [appear, appear + 230, appear + 350], [0, 1.12, 1], Extrapolation.CLAMP),
-      fillOpacity: fill,
+      scale: interpolate(
+        ms,
+        [t0, t0 + POP_UP, t0 + POP_SETTLE],
+        [0.0001, 1.12, 1],
+        Extrapolation.CLAMP
+      ),
     };
   });
 
   return (
-    <G transform={`rotate(${angle}, 100, 100) translate(100, ${LEAF_INNER_R})`}>
-      <AnimatedG animatedProps={props}>
-        <Path d={LEAF_PATH} fill={color} stroke={color} strokeWidth={5} strokeLinejoin="round" />
-      </AnimatedG>
+    <G rotation={ANGLES[index]} origin="100, 100">
+      <G x={100} y={64}>
+        <AnimatedG animatedProps={scaleProps}>
+          <AnimatedPath
+            animatedProps={fillProps}
+            d={LEAF}
+            fill={color}
+            stroke={color}
+            strokeWidth={LEAF_STROKE}
+            strokeLinejoin="round"
+          />
+        </AnimatedG>
+      </G>
     </G>
   );
 }
 
-// Saytdagi asosiy brend yashili — intro/loading shu rangda chiziladi
-const BRAND_GREEN = "#8DAE91";
-
 export function AnimatedLogo({
   variant = "intro",
   size = 160,
-  background = "#0E8F6D",
-  foreground = BRAND_GREEN,
+  background = BRAND_GREEN,
+  foreground = "#FFFFFF",
   onFinish,
 }: {
   variant?: Variant;
   size?: number;
-  /** null — orqa fon (yashil kvadrat) chizilmaydi */
+  /** null — yashil kvadrat fon chizilmaydi (masalan, tugma ichidagi kichik loader) */
   background?: string | null;
   foreground?: string;
   /** Faqat intro'da: animatsiya tugagach chaqiriladi */
   onFinish?: () => void;
 }) {
-  // Bitta umumiy taymlayn 0..1 — hamma bosqichlar shundan interpolate qilinadi.
+  // Bitta umumiy taymlayn 0..1 — hamma bosqichlar shundan interpolate qilinadi
   const t = useSharedValue(0);
 
   useEffect(() => {
     t.value = 0;
     if (variant === "loading") {
-      t.value = withRepeat(withTiming(1, { duration: SPIN_CYCLE, easing: Easing.linear }), -1);
+      t.value = withRepeat(withTiming(1, { duration: LOAD_CYCLE, easing: Easing.linear }), -1);
     } else {
       t.value = withTiming(1, { duration: INTRO_TOTAL, easing: Easing.linear }, (done) => {
         if (done && onFinish) runOnJS(onFinish)();
@@ -134,52 +155,62 @@ export function AnimatedLogo({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variant]);
 
-  // Kirish (faqat intro): butun ikonka 0.85 → 1 masshtab + xiralikdan chiqish
-  const enter = useAnimatedStyle(() => {
-    if (variant === "loading") return { opacity: 1, transform: [{ scale: 1 }] };
-    return {
-      opacity: interpolate(t.value, [0, 450 / INTRO_TOTAL], [0, 1], Extrapolation.CLAMP),
-      transform: [{ scale: interpolate(t.value, [0, 450 / INTRO_TOTAL], [0.85, 1], Extrapolation.CLAMP) }],
-    };
+  // Fon kvadrati: intro'da .85→1 kattalashib xiralikdan chiqadi, loading'da statik
+  const bgProps = useAnimatedProps(() => {
+    if (variant !== "intro") return { opacity: 1, scale: 1 };
+    const ms = t.value * INTRO_TOTAL;
+    const e = Easing.bezierFn(0.22, 1, 0.36, 1)(
+      interpolate(ms, [0, BG_DUR], [0, 1], Extrapolation.CLAMP)
+    );
+    return { opacity: e, scale: 0.85 + 0.15 * e };
   });
 
-  // Yakuniy puls (faqat intro): 1 → 1.045 → 1
-  const pulse = useAnimatedProps(() => ({
-    scale:
-      variant === "loading"
-        ? 1
-        : interpolate(t.value, [CHECK_END / INTRO_TOTAL, PULSE_PEAK / INTRO_TOTAL, 1], [1, 1.045, 1], Extrapolation.CLAMP),
-    origin: "100, 100",
-  }));
+  // Galochka: intro'da 1120ms da chizilib chiqadi, loading'da doim ko'rinadi
+  const checkProps = useAnimatedProps(() => {
+    if (variant !== "intro") return { strokeDashoffset: 0 };
+    const ms = t.value * INTRO_TOTAL;
+    const p = interpolate(ms, [CHECK_START, CHECK_START + CHECK_DUR], [0, 1], Extrapolation.CLAMP);
+    return { strokeDashoffset: CHECK_LEN * (1 - Easing.bezierFn(0.22, 1, 0.36, 1)(p)) };
+  });
 
-  // Galochka: loading'da statik to'liq, intro'da chizilib chiqadi
-  const check = useAnimatedProps(() => {
-    if (variant === "loading") return { strokeDashoffset: 0 };
-    const p = interpolate(t.value, [CHECK_START / INTRO_TOTAL, CHECK_END / INTRO_TOTAL], [0, 1], Extrapolation.CLAMP);
-    return { strokeDashoffset: CHECK_LEN * (1 - Easing.out(Easing.cubic)(p)) };
+  // Puls: butun logo 4.5% kattalashib joyiga qaytadi — "tayyor" signali
+  const pulseProps = useAnimatedProps(() => {
+    if (variant !== "intro") return { scale: 1 };
+    const ms = t.value * INTRO_TOTAL;
+    const p = interpolate(ms, [PULSE_START, PULSE_START + PULSE_DUR], [0, 1], Extrapolation.CLAMP);
+    const e = Easing.bezierFn(0.42, 0, 0.58, 1)(p);
+    return { scale: interpolate(e, [0, 0.45, 1], [1, 1.045, 1], Extrapolation.CLAMP) };
   });
 
   return (
-    <Animated.View style={[{ width: size, height: size }, enter]}>
+    <Animated.View style={{ width: size, height: size }}>
       <Svg width={size} height={size} viewBox="0 0 200 200">
-        {background ? <Rect x={0} y={0} width={200} height={200} rx={48} fill={background} /> : null}
-        <AnimatedG animatedProps={pulse}>
-          {ANGLES.map((a, i) => (
-            <Leaf key={a} angle={a} index={i} t={t} color={foreground} variant={variant} />
+        {background ? (
+          <AnimatedRect
+            animatedProps={bgProps}
+            x={0}
+            y={0}
+            width={200}
+            height={200}
+            rx={48}
+            fill={background}
+            origin="100, 100"
+          />
+        ) : null}
+        <AnimatedG animatedProps={pulseProps} origin="100, 100">
+          {ANGLES.map((_, i) => (
+            <Leaf key={i} index={i} t={t} color={foreground} variant={variant} />
           ))}
-          {/* Galochka faqat intro'da — loading'da faqat yaproqlar aylanadi */}
-          {variant === "intro" && (
-            <AnimatedPath
-              animatedProps={check}
-              d={CHECK_PATH}
-              fill="none"
-              stroke={foreground}
-              strokeWidth={7}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeDasharray={[CHECK_LEN, CHECK_LEN]}
-            />
-          )}
+          <AnimatedPath
+            animatedProps={checkProps}
+            d={CHECK}
+            fill="none"
+            stroke={foreground}
+            strokeWidth={CHECK_WIDTH}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeDasharray={[CHECK_LEN, CHECK_LEN]}
+          />
         </AnimatedG>
       </Svg>
     </Animated.View>
