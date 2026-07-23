@@ -27,7 +27,7 @@ export default function LogoDemo() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, alignItems: "center", justifyContent: "center", gap: 40, backgroundColor: "#0b1326" },
+  root: { flex: 1, alignItems: "center", justifyContent: "center", gap: 40, backgroundColor: "#0c1310" },
   row: { flexDirection: "row", gap: 40 },
   block: { alignItems: "center", gap: 14 },
   hint: { color: "rgba(255,255,255,0.45)", fontSize: 13 },

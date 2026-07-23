@@ -23,8 +23,9 @@ import { LocationPicker } from "@/components/pv/location-picker";
 import { SelectField } from "@/components/pv/select-field";
 import { useToast } from "@/components/pv/toast";
 import { GlassIconButton, GlassSurface, SmallButton } from "@/components/pv/ui";
-import { alpha, colors, radius } from "@/constants/colors";
+import { alpha, radius } from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useProvider } from "@/context/ProviderContext";
 import { supabase } from "@/lib/supabase";
@@ -54,6 +55,8 @@ function formatUzPhone(raw: string): string {
 }
 
 export default function BusinessProfileScreen() {
+  const styles = useStyles();
+  const colors = useColors();
   const router = useRouter();
   const { user } = useAuth();
   const { provider, reload } = useProvider();
@@ -458,7 +461,7 @@ export default function BusinessProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   title: { fontSize: 20, fontWeight: "800", color: colors.onSurface, flex: 1 },
 
@@ -533,4 +536,4 @@ const styles = StyleSheet.create({
 
   submitting: { alignItems: "center", gap: 8, paddingVertical: 12 },
   submittingText: { fontSize: 12, color: colors.onSurfaceVariant, fontWeight: "600" },
-});
+}));

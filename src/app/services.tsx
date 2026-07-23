@@ -18,8 +18,9 @@ import {
   Spinner,
   TogglePill,
 } from "@/components/pv/ui";
-import { alpha, colors, radius } from "@/constants/colors";
+import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
 import { useBookingMode } from "@/hooks/useBookingMode";
 import { supabase } from "@/lib/supabase";
@@ -42,6 +43,8 @@ interface Service {
 const DURATION_PRESETS = [15, 20, 30, 45, 60, 90, 120];
 
 function ServicesContent() {
+  const styles = useStyles();
+  const colors = useColors();
   const { t, lang } = useLanguage();
   const { provider } = useProvider();
   const { showToast } = useToast();
@@ -450,7 +453,7 @@ export default function ServicesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   backRow: { flexDirection: "row", alignItems: "center", gap: 12 },
   warnBanner: {
     flexDirection: "row",
@@ -572,4 +575,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.errorContainer,
   },
   deleteConfirmText: { fontSize: 11, fontWeight: "700", color: colors.onErrorContainer },
-});
+}));

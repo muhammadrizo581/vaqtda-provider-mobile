@@ -3,7 +3,8 @@
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import React, { useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radius } from "@/constants/colors";
+import { radius } from "@/constants/colors";
+import { makeThemedStyles, useColors, useTheme } from "@/context/ThemeContext";
 
 function toDate(hhmm: string): Date {
   const [h, m] = (hhmm || "09:00").split(":").map(Number);
@@ -26,6 +27,9 @@ export function TimeField({
   onChange: (v: string) => void;
   invalid?: boolean;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
+  const { scheme } = useTheme();
   const [open, setOpen] = useState(false);
 
   const handleChange = (event: DateTimePickerEvent, date?: Date) => {
@@ -60,7 +64,7 @@ export function TimeField({
                 mode="time"
                 display="spinner"
                 onChange={handleChange}
-                themeVariant="dark"
+                themeVariant={scheme}
                 locale="uz-UZ"
               />
               <Pressable style={styles.doneBtn} onPress={() => setOpen(false)}>
@@ -74,7 +78,7 @@ export function TimeField({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   label: {
     fontSize: 10,
     color: colors.onSurfaceVariant,
@@ -113,4 +117,4 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   doneText: { color: colors.onPrimary, fontWeight: "700", fontSize: 14 },
-});
+}));

@@ -6,6 +6,7 @@ import {
   BarChart3,
   CalendarDays,
   ChevronRight,
+  LogIn,
   Monitor,
   Settings,
   Store,
@@ -16,9 +17,11 @@ import {
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Screen } from "@/components/pv/screen";
-import { GlassSurface, PageHeader } from "@/components/pv/ui";
-import { alpha, colors, radius, toneColors, type Tone } from "@/constants/colors";
+import { ClientAvatar, GlassSurface, PageHeader } from "@/components/pv/ui";
+import { alpha, radius, type Tone } from "@/constants/colors";
+import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors, useToneColors } from "@/context/ThemeContext";
 import { useBookingMode } from "@/hooks/useBookingMode";
 
 interface MoreItem {
@@ -31,8 +34,12 @@ interface MoreItem {
 }
 
 export default function MoreScreen() {
+  const colors = useColors();
+  const tones = useToneColors();
+  const styles = useStyles();
   const { t } = useLanguage();
   const { mode, unit } = useBookingMode();
+  const { user, isAuthenticated } = useAuth();
   const router = useRouter();
 
   // table rejimida xizmat tushunchasi yo'q — bo'lim "Stollar" yoki "Kompyuterlar"
@@ -51,6 +58,14 @@ export default function MoreScreen() {
   const ServicesIcon = mode === "table" ? (unit === "computer" ? Monitor : Armchair) : Tag;
 
   const items: MoreItem[] = [
+    {
+      key: "profile",
+      icon: Store,
+      title: t("pv.more_profile"),
+      subtitle: t("pv.more_profile_sub"),
+      href: "/business-profile" as Href,
+      tone: "primary",
+    },
     {
       key: "schedule",
       icon: CalendarDays,
@@ -89,14 +104,6 @@ export default function MoreScreen() {
       tone: "tertiary",
     },
     {
-      key: "profile",
-      icon: Store,
-      title: t("pv.more_profile"),
-      subtitle: t("pv.more_profile_sub"),
-      href: "/business-profile" as Href,
-      tone: "primary",
-    },
-    {
       key: "settings",
       icon: Settings,
       title: t("pv.more_settings"),
@@ -110,9 +117,56 @@ export default function MoreScreen() {
     <Screen>
       <PageHeader title={t("pv.nav_more")} subtitle={t("pv.more_sub")} />
 
+      {/* Profil: kirgan bo'lsa — hisob kartasi, bo'lmasa — Kirish */}
+      {isAuthenticated ? (
+        <Pressable onPress={() => router.push("/settings")}>
+          {({ pressed }) => (
+            <GlassSurface
+              style={[styles.accountGlass, pressed && { opacity: 0.85 }]}
+              fallbackStyle={styles.rowFallback}
+              interactive
+            >
+              <ClientAvatar name={user?.name || null} avatarUrl={user?.avatar} size={44} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.rowTitle} numberOfLines={1}>
+                  {user?.name}
+                </Text>
+                <Text style={styles.rowSub} numberOfLines={1}>
+                  {user?.email}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={colors.outline} />
+            </GlassSurface>
+          )}
+        </Pressable>
+      ) : (
+        <Pressable onPress={() => router.push("/login")}>
+          {({ pressed }) => (
+            <GlassSurface
+              style={[styles.accountGlass, pressed && { opacity: 0.85 }]}
+              fallbackStyle={styles.rowFallback}
+              interactive
+            >
+              <View style={[styles.rowIcon, { backgroundColor: alpha(colors.primaryContainer, 0.2) }]}>
+                <LogIn size={19} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.rowTitle} numberOfLines={1}>
+                  {t("auth.login")}
+                </Text>
+                <Text style={styles.rowSub} numberOfLines={1}>
+                  {t("pv.login_sub")}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={colors.outline} />
+            </GlassSurface>
+          )}
+        </Pressable>
+      )}
+
       <View style={styles.list}>
         {items.map((item) => {
-          const c = toneColors[item.tone];
+          const c = tones[item.tone];
           return (
             <Pressable key={item.key} onPress={() => router.push(item.href)}>
               {({ pressed }) => (
@@ -143,8 +197,16 @@ export default function MoreScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   list: { gap: 10 },
+  accountGlass: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    borderRadius: radius.xl,
+    overflow: "hidden",
+  },
   rowGlass: {
     flexDirection: "row",
     alignItems: "center",
@@ -167,4 +229,4 @@ const styles = StyleSheet.create({
   },
   rowTitle: { fontSize: 15, fontWeight: "700", color: colors.onSurface },
   rowSub: { fontSize: 12, color: colors.onSurfaceVariant, marginTop: 2 },
-});
+}));

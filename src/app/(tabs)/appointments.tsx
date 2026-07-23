@@ -25,8 +25,9 @@ import {
   Spinner,
   StatusBadge,
 } from "@/components/pv/ui";
-import { alpha, colors } from "@/constants/colors";
+import { alpha } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useAppointments, type Appointment } from "@/hooks/useAppointments";
 import { localize } from "@/utils/localize";
 import { formatSom } from "@/utils/price";
@@ -45,6 +46,8 @@ const dayCount = (from: string, to: string) => {
 type StatusFilter = "all" | "upcoming" | "completed" | "cancelled";
 
 function AppointmentsContent() {
+  const colors = useColors();
+  const styles = useStyles();
   const { t, lang } = useLanguage();
   const { appointments, loading, reload, act } = useAppointments();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -303,7 +306,7 @@ export default function AppointmentsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   searchWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -366,4 +369,4 @@ const styles = StyleSheet.create({
   phoneText: { fontSize: 12, color: colors.secondary },
   notes: { fontSize: 12, color: alpha(colors.onSurfaceVariant, 0.8), marginTop: 4, fontStyle: "italic" },
   actions: { flexDirection: "row", gap: 8 },
-});
+}));

@@ -15,11 +15,14 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedLogo } from "@/components/animated-logo";
 import { FilterPill, GlassSurface, liquidGlass } from "@/components/pv/ui";
-import { alpha, colors, radius } from "@/constants/colors";
+import { alpha, radius } from "@/constants/colors";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 
 export default function LoginScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { login, logout, user, isAuthenticated } = useAuth();
   const { t, lang, setLang } = useLanguage();
   const insets = useSafeAreaInsets();
@@ -148,7 +151,7 @@ export default function LoginScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   container: { flexGrow: 1, justifyContent: "center", paddingHorizontal: 24 },
   logoWrap: { alignItems: "center", marginBottom: 32 },
   logoBox: {
@@ -210,4 +213,4 @@ const styles = StyleSheet.create({
   submitText: { color: colors.onPrimary, fontWeight: "800", fontSize: 14 },
 
   langRow: { flexDirection: "row", justifyContent: "center", gap: 8, marginTop: 24 },
-});
+}));

@@ -4,7 +4,8 @@ import React, { createContext, useCallback, useContext, useRef, useState } from 
 import { Animated, StyleSheet, Text, useAnimatedValue } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GlassSurface, liquidGlass } from "@/components/pv/ui";
-import { alpha, colors, radius } from "@/constants/colors";
+import { alpha, radius } from "@/constants/colors";
+import { useColors } from "@/context/ThemeContext";
 
 type ToastKind = "success" | "error";
 
@@ -15,6 +16,7 @@ interface ToastContextType {
 const ToastContext = createContext<ToastContextType | undefined>(undefined);
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
+  const colors = useColors();
   const [toast, setToast] = useState<{ message: string; kind: ToastKind } | null>(null);
   const progress = useAnimatedValue(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);

@@ -4,20 +4,21 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AnimatedLogo } from "@/components/animated-logo";
 import { ToastProvider } from "@/components/pv/toast";
 import { VaqtdaSplash } from "@/components/vaqtda-splash";
-import { colors } from "@/constants/colors";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ProviderProvider } from "@/context/ProviderContext";
+import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
   const { isAuthenticated, user, loading } = useAuth();
+  const { colors } = useTheme();
   const [introDone, setIntroDone] = useState(false);
 
   // Splash darhol yopiladi — uning o'rnida intro animatsiya o'ynaydi
@@ -57,7 +58,18 @@ function RootNavigator() {
           yuklanayotgan bo'lsa, splash tugagach shimmer-loader kutib turadi */}
       {showOverlay &&
         (introDone ? (
-          <View style={styles.introOverlay}>
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: colors.background,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <AnimatedLogo variant="loading" size={100} />
           </View>
         ) : (
@@ -67,32 +79,30 @@ function RootNavigator() {
   );
 }
 
-const styles = StyleSheet.create({
-  introOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: colors.background,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-});
+function ThemedApp() {
+  const { scheme } = useTheme();
+  return (
+    <>
+      <StatusBar style={scheme === "dark" ? "light" : "dark"} />
+      <RootNavigator />
+    </>
+  );
+}
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <LanguageProvider>
-        <AuthProvider>
-          <ProviderProvider>
-            <ToastProvider>
-              <StatusBar style="light" />
-              <RootNavigator />
-            </ToastProvider>
-          </ProviderProvider>
-        </AuthProvider>
-      </LanguageProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <ProviderProvider>
+              <ToastProvider>
+                <ThemedApp />
+              </ToastProvider>
+            </ProviderProvider>
+          </AuthProvider>
+        </LanguageProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

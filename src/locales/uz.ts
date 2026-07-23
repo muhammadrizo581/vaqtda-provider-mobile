@@ -358,6 +358,7 @@ export const uz = {
   "tt.no_business_title": "Avval biznes yarating",
   "tt.no_business_desc": "Jadval yaratish uchun avval biznesingizni qo'shing. Keyin shu yerda ish vaqtlaringizni belgilaysiz.",
   "tt.create_business": "Biznes yaratish",
+  "tt.logged_in_as": "Kirgan hisob:",
   "tt.title": "Jadval yaratish",
   "tt.subtitle": "Aniq sanalarni belgilang — mijozlar faqat siz tanlagan kunlarni ko'radi.",
   "tt.tashkent_time": "Toshkent vaqti",
@@ -592,6 +593,7 @@ export const uz = {
   "pv.more_profile_sub": "Biznes ma'lumotlarini tahrirlash",
   "pv.more_settings": "Sozlamalar",
   "pv.more_settings_sub": "Til, parol va hisob",
+  "pv.login_sub": "Davom etish uchun hisobingizga kiring",
   // chat (provayder <-> mijoz yozishmalari)
   "chat.title": "Xabarlar",
   "chat.sub": "Mijozlar bilan yozishmalar",
@@ -662,6 +664,10 @@ export const uz = {
   "pv.computers_title": "Kompyuterlar boshqaruvi",
   "pv.computers_sub": "Mijozlar bron qilishda shu kompyuterlardan tanlaydi. Bu turdagi biznes uchun xizmat qo'shish shart emas.",
   "pv.lang": "Til",
+  "pv.theme": "Tema",
+  "pv.theme_dark": "Tungi",
+  "pv.theme_light": "Yorug'",
+  "pv.theme_system": "Tizim",
   "pv.search_ph": "Mijoz, telefon yoki xizmat bo'yicha qidirish...",
 
   // ── 404 ──

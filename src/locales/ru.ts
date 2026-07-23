@@ -360,6 +360,7 @@ export const ru: Record<TKey, string> = {
   "tt.no_business_title": "Сначала создайте бизнес",
   "tt.no_business_desc": "Чтобы создать расписание, сначала добавьте бизнес. Затем укажите рабочее время здесь.",
   "tt.create_business": "Создать бизнес",
+  "tt.logged_in_as": "Вы вошли как:",
   "tt.title": "Создание расписания",
   "tt.subtitle": "Указывайте конкретные даты — клиенты видят только выбранные вами дни.",
   "tt.tashkent_time": "Ташкентское время",
@@ -593,6 +594,7 @@ export const ru: Record<TKey, string> = {
   "pv.more_profile_sub": "Редактирование данных бизнеса",
   "pv.more_settings": "Настройки",
   "pv.more_settings_sub": "Язык, пароль и аккаунт",
+  "pv.login_sub": "Войдите в аккаунт, чтобы продолжить",
   // чат (переписка провайдер <-> клиент)
   "chat.title": "Сообщения",
   "chat.sub": "Переписка с клиентами",
@@ -663,6 +665,10 @@ export const ru: Record<TKey, string> = {
   "pv.computers_title": "Управление компьютерами",
   "pv.computers_sub": "Клиенты выбирают компьютер при бронировании. Для этого типа бизнеса услуги не нужны.",
   "pv.lang": "Язык",
+  "pv.theme": "Тема",
+  "pv.theme_dark": "Тёмная",
+  "pv.theme_light": "Светлая",
+  "pv.theme_system": "Системная",
   "pv.search_ph": "Поиск по клиенту, телефону или услуге...",
 
   // ── 404 ──

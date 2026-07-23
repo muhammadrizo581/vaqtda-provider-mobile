@@ -27,8 +27,9 @@ import {
   StatCard,
   StatusBadge,
 } from "@/components/pv/ui";
-import { alpha, colors } from "@/constants/colors";
+import { alpha } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useAppointments, type Appointment } from "@/hooks/useAppointments";
 import { useWaitlistEntries } from "@/hooks/useWaitlistEntries";
 import { localize } from "@/utils/localize";
@@ -48,6 +49,8 @@ function statusTone(status: string): "secondary" | "primary" | "muted" | "error"
 }
 
 function OverviewContent() {
+  const colors = useColors();
+  const styles = useStyles();
   const { t, lang } = useLanguage();
   const { appointments, loading, reload, act } = useAppointments();
   const { entries: waitlist, reload: reloadWaitlist } = useWaitlistEntries();
@@ -234,7 +237,7 @@ export default function OverviewScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
   title: { fontSize: 22, fontWeight: "700", color: colors.onSurface, letterSpacing: -0.5 },
   subtitle: { fontSize: 14, color: colors.onSurfaceVariant, marginTop: 2 },
@@ -262,4 +265,4 @@ const styles = StyleSheet.create({
   apptTime: { flexDirection: "row", alignItems: "center", gap: 8 },
   apptTimeText: { fontSize: 14, fontWeight: "700", color: colors.onSurface },
   apptActions: { flexDirection: "row", gap: 8 },
-});
+}));

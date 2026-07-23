@@ -14,8 +14,9 @@ import {
   Spinner,
   TogglePill,
 } from "@/components/pv/ui";
-import { alpha, colors, radius } from "@/constants/colors";
+import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
 import { supabase } from "@/lib/supabase";
 
@@ -35,6 +36,8 @@ const BULK_MAX = 200;
 const PC_TYPE_PRESETS = ["Standart", "VIP", "Premium", "PlayStation"];
 
 export function TablesManager({ variant = "table" }: { variant?: "table" | "computer" }) {
+  const colors = useColors();
+  const styles = useStyles();
   const { t } = useLanguage();
   const { provider } = useProvider();
   const { showToast } = useToast();
@@ -470,7 +473,7 @@ export function TablesManager({ variant = "table" }: { variant?: "table" | "comp
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   title: { fontSize: 16, fontWeight: "700", color: colors.onSurface },
   sub: { fontSize: 13, color: colors.onSurfaceVariant, lineHeight: 18 },
 
@@ -535,4 +538,4 @@ const styles = StyleSheet.create({
   rowMeta: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3 },
   rowMetaText: { fontSize: 12, color: colors.onSurfaceVariant },
   hiddenText: { fontSize: 12, color: colors.onSurfaceVariant },
-});
+}));

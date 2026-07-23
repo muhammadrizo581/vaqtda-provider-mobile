@@ -23,8 +23,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedLogo } from "@/components/animated-logo";
 import { useToast } from "@/components/pv/toast";
 import { ClientAvatar, GlassSurface, liquidGlass, Spinner } from "@/components/pv/ui";
-import { alpha, colors } from "@/constants/colors";
+import { alpha } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { chatImageUrl, formatChatDay, formatChatTime } from "@/utils/chat";
 
@@ -48,6 +49,8 @@ interface ConversationInfo {
 const MAX_IMAGE_MB = 5;
 
 export default function ChatThreadScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { t } = useLanguage();
   const { showToast } = useToast();
   const router = useRouter();
@@ -410,7 +413,7 @@ export default function ChatThreadScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
 
   header: {
@@ -515,4 +518,4 @@ const styles = StyleSheet.create({
   sendFallback: {
     backgroundColor: colors.primary,
   },
-});
+}));

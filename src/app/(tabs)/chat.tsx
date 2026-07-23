@@ -9,8 +9,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { BusinessGate } from "@/components/pv/business-gate";
 import { Screen } from "@/components/pv/screen";
 import { Card, ClientAvatar, EmptyState, PageHeader, Spinner } from "@/components/pv/ui";
-import { colors } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
 import { supabase } from "@/lib/supabase";
 import { formatChatTime, isImageText } from "@/utils/chat";
@@ -26,6 +26,8 @@ interface ChatConversation {
 }
 
 function ChatListContent() {
+  const colors = useColors();
+  const styles = useStyles();
   const { t } = useLanguage();
   const { provider } = useProvider();
   const router = useRouter();
@@ -138,7 +140,7 @@ export default function ChatListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   row: {
     padding: 14,
     flexDirection: "row",
@@ -166,4 +168,4 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   unreadText: { fontSize: 10, fontWeight: "800", color: colors.onPrimary },
-});
+}));

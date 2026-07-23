@@ -5,12 +5,13 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Badge, Icon, Label, NativeTabs, VectorIcon } from "expo-router/unstable-native-tabs";
 import React from "react";
-import { colors } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { useColors } from "@/context/ThemeContext";
 import { useChatUnread } from "@/hooks/useChatUnread";
 
 export default function TabsLayout() {
   const { t } = useLanguage();
+  const colors = useColors();
   const chatUnread = useChatUnread();
 
   return (

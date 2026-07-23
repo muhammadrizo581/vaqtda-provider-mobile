@@ -3,7 +3,8 @@
 import React, { useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { WebView } from "react-native-webview";
-import { colors, radius } from "@/constants/colors";
+import { radius } from "@/constants/colors";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 
 const YANDEX_MAPS_KEY = "6bac23fd-42ad-42d1-aceb-3fd1630a9ac8";
 
@@ -14,13 +15,15 @@ export function LocationPicker({
   coordinates: [number, number]; // [lat, lng]
   onChange: (coords: [number, number]) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const html = useMemo(
     () => `<!DOCTYPE html>
 <html>
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
   <script src="https://api-maps.yandex.ru/2.1/?apikey=${YANDEX_MAPS_KEY}&lang=ru_RU"></script>
-  <style>html,body,#map{margin:0;padding:0;width:100%;height:100%;background:#171f33;}</style>
+  <style>html,body,#map{margin:0;padding:0;width:100%;height:100%;background:#16211b;}</style>
 </head>
 <body>
   <div id="map"></div>
@@ -74,7 +77,7 @@ export function LocationPicker({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   wrap: {
     height: 240,
     borderRadius: radius.lg,
@@ -82,4 +85,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.outlineVariant,
   },
-});
+}));

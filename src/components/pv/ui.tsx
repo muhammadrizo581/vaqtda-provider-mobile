@@ -5,7 +5,8 @@ import type { LucideIcon } from "lucide-react-native";
 import React from "react";
 import { Platform, Pressable, StyleSheet, Switch, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { AnimatedLogo } from "@/components/animated-logo";
-import { alpha, colors, radius, toneColors, type BadgeTone, type Tone } from "@/constants/colors";
+import { alpha, radius, type BadgeTone, type Tone } from "@/constants/colors";
+import { makeThemedStyles, useColors, useTheme, useToneColors } from "@/context/ThemeContext";
 
 // iOS 26+ Liquid Glass mavjudmi — bo'lmasa (Android, eski iOS) eski tekis ko'rinish qoladi.
 export const liquidGlass = Platform.OS === "ios" && isLiquidGlassAvailable();
@@ -25,11 +26,12 @@ export function GlassSurface({
   tintColor?: string;
   interactive?: boolean;
 }) {
+  const { scheme } = useTheme();
   if (liquidGlass) {
     return (
       <GlassView
         glassEffectStyle="regular"
-        colorScheme="dark"
+        colorScheme={scheme}
         tintColor={tintColor}
         isInteractive={interactive}
         style={style}
@@ -55,7 +57,8 @@ export function StatCard({
   icon: LucideIcon;
   tone?: Tone;
 }) {
-  const c = toneColors[tone];
+  const styles = useStyles();
+  const c = useToneColors()[tone];
   return (
     <GlassSurface
       style={styles.statCardGlass}
@@ -71,7 +74,9 @@ export function StatCard({
         </View>
       </View>
       <View style={styles.statCardValueRow}>
-        <Text style={styles.statCardValue}>{value}</Text>
+        <Text style={styles.statCardValue} numberOfLines={1}>
+          {value}
+        </Text>
         {suffix ? <Text style={styles.statCardSuffix}>{suffix}</Text> : null}
       </View>
     </GlassSurface>
@@ -80,12 +85,14 @@ export function StatCard({
 
 // ── Holat belgisi (badge) ──
 export function StatusBadge({ label, tone }: { label: string; tone: BadgeTone }) {
-  const bg =
-    tone === "muted" ? colors.surfaceVariant : alpha(toneColors[tone].container, 0.2);
+  const styles = useStyles();
+  const colors = useColors();
+  const tones = useToneColors();
+  const bg = tone === "muted" ? colors.surfaceVariant : alpha(tones[tone].container, 0.2);
   const border =
-    tone === "muted" ? colors.outlineVariant : alpha(toneColors[tone].container, 0.3);
-  const text = tone === "muted" ? colors.onSurfaceVariant : toneColors[tone].text;
-  const dot = tone === "muted" ? colors.outline : toneColors[tone].text;
+    tone === "muted" ? colors.outlineVariant : alpha(tones[tone].container, 0.3);
+  const text = tone === "muted" ? colors.onSurfaceVariant : tones[tone].text;
+  const dot = tone === "muted" ? colors.outline : tones[tone].text;
   return (
     <View style={[styles.badge, { backgroundColor: bg, borderColor: border }]}>
       <View style={[styles.badgeDot, { backgroundColor: dot }]} />
@@ -104,6 +111,7 @@ export function PageHeader({
   subtitle?: string;
   action?: React.ReactNode;
 }) {
+  const styles = useStyles();
   return (
     <View style={styles.pageHeader}>
       <View style={{ flex: 1 }}>
@@ -125,6 +133,7 @@ export function ClientAvatar({
   avatarUrl?: string | null;
   size?: number;
 }) {
+  const colors = useColors();
   if (avatarUrl) {
     return (
       <Image
@@ -169,6 +178,8 @@ export function EmptyState({
   title: string;
   desc?: string;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <View style={styles.empty}>
       <View style={styles.emptyIcon}>
@@ -199,6 +210,7 @@ export function GlassIconButton({
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
+  const styles = useStyles();
   return (
     <GlassSurface
       style={[styles.iconBtnGlass, style]}
@@ -222,12 +234,15 @@ export function FilterPill({
   active: boolean;
   onPress: () => void;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
+  const { scheme } = useTheme();
   if (liquidGlass) {
     return (
       <Pressable onPress={onPress}>
         <GlassView
           glassEffectStyle="regular"
-          colorScheme="dark"
+          colorScheme={scheme}
           isInteractive
           tintColor={active ? colors.primary : undefined}
           style={styles.pillGlass}
@@ -278,6 +293,9 @@ export function SmallButton({
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
+  const { scheme } = useTheme();
   const bg =
     variant === "primary" ? colors.primary : variant === "error" ? alpha(colors.errorContainer, 0.35) : colors.surface;
   const fg =
@@ -299,7 +317,7 @@ export function SmallButton({
       >
         <GlassView
           glassEffectStyle="regular"
-          colorScheme="dark"
+          colorScheme={scheme}
           isInteractive
           tintColor={tint}
           style={styles.smallBtnGlass}
@@ -346,6 +364,8 @@ export function SmallButton({
 // iOS'da tizim UISwitch ishlatiladi — iOS 26 da u avtomatik Liquid Glass ko'rinishga ega.
 // Android/webda web'dagi 11×6 track dizayni qoladi.
 export function TogglePill({ value, onToggle }: { value: boolean; onToggle: () => void }) {
+  const styles = useStyles();
+  const colors = useColors();
   if (Platform.OS === "ios") {
     return (
       <Switch
@@ -376,9 +396,11 @@ export function TogglePill({ value, onToggle }: { value: boolean; onToggle: () =
 
 // ── Karta (umumiy konteyner) ──
 export function Card({ children, style }: { children: React.ReactNode; style?: StyleProp<ViewStyle> }) {
+  const styles = useStyles();
+  const { scheme } = useTheme();
   if (liquidGlass) {
     return (
-      <GlassView glassEffectStyle="regular" colorScheme="dark" style={[styles.cardGlass, style]}>
+      <GlassView glassEffectStyle="regular" colorScheme={scheme} style={[styles.cardGlass, style]}>
         {children}
       </GlassView>
     );
@@ -386,155 +408,149 @@ export function Card({ children, style }: { children: React.ReactNode; style?: S
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-const styles = StyleSheet.create({
-  statCard: {
-    backgroundColor: colors.surfaceContainer,
-    padding: 12,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    flex: 1,
-  },
-  statCardGlass: {
-    padding: 12,
-    borderRadius: radius.xl,
-    flex: 1,
-    overflow: "hidden",
-  },
-  statCardFallback: {
-    backgroundColor: colors.surfaceContainer,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  statCardTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 8,
-    marginBottom: 10,
-  },
-  statCardLabel: {
-    fontSize: 12,
-    fontWeight: "500",
-    color: colors.onSurfaceVariant,
-    flex: 1,
-    lineHeight: 16,
-  },
-  statCardIcon: { padding: 6, borderRadius: radius.md },
-  statCardValueRow: { flexDirection: "row", alignItems: "baseline", gap: 8 },
-  statCardValue: { fontSize: 24, fontWeight: "700", color: colors.onSurface, letterSpacing: -0.5 },
-  statCardSuffix: { fontSize: 12, fontWeight: "600", color: colors.onSurfaceVariant },
+const useStyles = makeThemedStyles((colors) =>
+  StyleSheet.create({
+    statCardGlass: {
+      padding: 12,
+      borderRadius: radius.xl,
+      flex: 1,
+      overflow: "hidden",
+    },
+    statCardFallback: {
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    statCardTop: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 8,
+      marginBottom: 10,
+    },
+    statCardLabel: {
+      fontSize: 12,
+      fontWeight: "500",
+      color: colors.onSurfaceVariant,
+      flex: 1,
+      lineHeight: 16,
+    },
+    statCardIcon: { padding: 6, borderRadius: radius.md },
+    statCardValueRow: { flexDirection: "row", alignItems: "baseline", gap: 8 },
+    statCardValue: { fontSize: 24, fontWeight: "700", color: colors.onSurface, letterSpacing: -0.5 },
+    statCardSuffix: { fontSize: 12, fontWeight: "600", color: colors.onSurfaceVariant },
 
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    borderWidth: 1,
-    alignSelf: "flex-start",
-  },
-  badgeDot: { width: 6, height: 6, borderRadius: 3 },
-  badgeText: { fontSize: 11, fontWeight: "600" },
+    badge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 999,
+      borderWidth: 1,
+      alignSelf: "flex-start",
+    },
+    badgeDot: { width: 6, height: 6, borderRadius: 3 },
+    badgeText: { fontSize: 11, fontWeight: "600" },
 
-  pageHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    gap: 16,
-  },
-  pageTitle: { fontSize: 24, fontWeight: "700", color: colors.onSurface, letterSpacing: -0.5 },
-  pageSubtitle: { fontSize: 15, color: colors.onSurfaceVariant, marginTop: 4 },
+    pageHeader: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-end",
+      gap: 16,
+    },
+    pageTitle: { fontSize: 24, fontWeight: "700", color: colors.onSurface, letterSpacing: -0.5 },
+    pageSubtitle: { fontSize: 15, color: colors.onSurfaceVariant, marginTop: 4 },
 
-  empty: { alignItems: "center", justifyContent: "center", paddingVertical: 48, paddingHorizontal: 24 },
-  emptyIcon: {
-    height: 48,
-    width: 48,
-    borderRadius: radius.lg,
-    backgroundColor: colors.surfaceContainerHigh,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 12,
-  },
-  emptyTitle: { fontWeight: "700", color: colors.onSurface, textAlign: "center" },
-  emptyDesc: { fontSize: 13, color: colors.onSurfaceVariant, marginTop: 4, textAlign: "center", maxWidth: 320 },
+    empty: { alignItems: "center", justifyContent: "center", paddingVertical: 48, paddingHorizontal: 24 },
+    emptyIcon: {
+      height: 48,
+      width: 48,
+      borderRadius: radius.lg,
+      backgroundColor: colors.surfaceContainerHigh,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 12,
+    },
+    emptyTitle: { fontWeight: "700", color: colors.onSurface, textAlign: "center" },
+    emptyDesc: { fontSize: 13, color: colors.onSurfaceVariant, marginTop: 4, textAlign: "center", maxWidth: 320 },
 
-  pill: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  pillGlass: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-  pillText: { fontSize: 13, fontWeight: "600" },
+    pill: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 999,
+      borderWidth: 1,
+    },
+    pillGlass: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 999,
+      overflow: "hidden",
+    },
+    pillText: { fontSize: 13, fontWeight: "600" },
 
-  iconBtnGlass: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    overflow: "hidden",
-  },
-  iconBtnFallback: {
-    borderRadius: radius.md,
-    backgroundColor: colors.surfaceContainer,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
-  iconBtnInner: { flex: 1, alignItems: "center", justifyContent: "center" },
+    iconBtnGlass: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      overflow: "hidden",
+    },
+    iconBtnFallback: {
+      borderRadius: radius.md,
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    iconBtnInner: { flex: 1, alignItems: "center", justifyContent: "center" },
 
-  smallBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  smallBtnGlass: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
-    overflow: "hidden",
-  },
-  smallBtnText: { fontSize: 12, fontWeight: "600" },
+    smallBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: radius.md,
+      borderWidth: 1,
+    },
+    smallBtnGlass: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 999,
+      overflow: "hidden",
+    },
+    smallBtnText: { fontSize: 12, fontWeight: "600" },
 
-  // UISwitch (51×31) ni pill (44×24) o'lchamiga yaqinlashtirish
-  nativeSwitch: {
-    transform: [{ scale: 0.8 }],
-    marginVertical: -4,
-    marginHorizontal: -5,
-  },
+    // UISwitch (51×31) ni pill (44×24) o'lchamiga yaqinlashtirish
+    nativeSwitch: {
+      transform: [{ scale: 0.8 }],
+      marginVertical: -4,
+      marginHorizontal: -5,
+    },
 
-  toggleTrack: {
-    width: 44,
-    height: 24,
-    borderRadius: 999,
-    padding: 3,
-    justifyContent: "center",
-  },
-  toggleKnob: { width: 18, height: 18, borderRadius: 9 },
+    toggleTrack: {
+      width: 44,
+      height: 24,
+      borderRadius: 999,
+      padding: 3,
+      justifyContent: "center",
+    },
+    toggleKnob: { width: 18, height: 18, borderRadius: 9 },
 
-  card: {
-    backgroundColor: colors.surfaceContainer,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-    overflow: "hidden",
-  },
-  cardGlass: {
-    borderRadius: radius.xl,
-    overflow: "hidden",
-  },
-});
+    card: {
+      backgroundColor: colors.surfaceContainer,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+      overflow: "hidden",
+    },
+    cardGlass: {
+      borderRadius: radius.xl,
+      overflow: "hidden",
+    },
+  })
+);

@@ -2,7 +2,8 @@
 import { Check, ChevronDown } from "lucide-react-native";
 import React, { useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import { colors, radius } from "@/constants/colors";
+import { radius } from "@/constants/colors";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 
 export interface SelectOption {
   value: string;
@@ -22,6 +23,8 @@ export function SelectField({
   placeholder?: string;
   onChange: (v: string) => void;
 }) {
+  const colors = useColors();
+  const styles = useStyles();
   const [open, setOpen] = useState(false);
   const selected = options.find((o) => o.value === value);
 
@@ -73,7 +76,7 @@ export function SelectField({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: "600",
@@ -126,4 +129,4 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   optionText: { fontSize: 14, color: colors.onSurface, flex: 1 },
-});
+}));

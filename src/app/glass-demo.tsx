@@ -53,7 +53,7 @@ export default function GlassDemoScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#0b1326" },
+  root: { flex: 1, backgroundColor: "#0c1310" },
   block: {
     height: 140,
     marginHorizontal: 20,
@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  blockText: { fontSize: 28, fontWeight: "800", color: "#0b1326" },
+  blockText: { fontSize: 28, fontWeight: "800", color: "#0c1310" },
   header: {
     position: "absolute",
     left: 20,

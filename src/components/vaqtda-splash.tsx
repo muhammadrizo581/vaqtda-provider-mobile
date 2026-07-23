@@ -1,5 +1,5 @@
 // Kirish splash'i — artifactdagi yangi logo introsi bilan, ilovaning
-// "Midnight Slate" to'q temasida qoladi: to'q navy radial fon + belgi orqasida
+// faol temasida: radial fon (Zumrad palitra) + belgi orqasida
 // yumshoq yashil nur. Yashil kvadrat ikon "gullab" ochiladi (aylanma to'lish →
 // galochka → puls), so'ng "Vaqtda" so'zi ko'tarilib chiqadi, oxirida butun
 // ekran kattalashib xiralashadi va onDone chaqiriladi.
@@ -15,7 +15,7 @@ import Animated, {
 } from "react-native-reanimated";
 import Svg, { Circle, Defs, RadialGradient, Rect, Stop } from "react-native-svg";
 import { AnimatedLogo, BRAND_GREEN } from "@/components/animated-logo";
-import { colors } from "@/constants/colors";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 
 const WORD_DELAY = 1480; // "Vaqtda" so'zi logo pulsi bilan birga ko'tariladi
 const FADE_DUR = 450;
@@ -29,6 +29,8 @@ export function VaqtdaSplash({
   /** Fade boshlanadigan umumiy davomiylik (ms) */
   duration?: number;
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   const word = useSharedValue(0);
   const gone = useSharedValue(0);
 
@@ -79,7 +81,9 @@ export function VaqtdaSplash({
   );
 }
 
-const styles = StyleSheet.create({
-  root: { alignItems: "center", justifyContent: "center", gap: 20, zIndex: 20 },
-  word: { color: colors.onSurface, fontSize: 30, fontWeight: "700", letterSpacing: -0.5 },
-});
+const useStyles = makeThemedStyles((colors) =>
+  StyleSheet.create({
+    root: { alignItems: "center", justifyContent: "center", gap: 20, zIndex: 20 },
+    word: { color: colors.onSurface, fontSize: 30, fontWeight: "700", letterSpacing: -0.5 },
+  })
+);

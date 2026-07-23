@@ -14,8 +14,9 @@ import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Screen } from "@/components/pv/screen";
 import { Card, GlassIconButton, GlassSurface, Spinner } from "@/components/pv/ui";
-import { alpha, colors, radius } from "@/constants/colors";
+import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProviderStats } from "@/hooks/useProviderStats";
 
 type Period = "week" | "month" | "all";
@@ -42,7 +43,10 @@ function fmtUZS(n: number, ru: boolean): string {
 }
 
 // Kichik vertikal bar grafik
-function BarChart({ data, color = colors.primary }: { data: { label: string; value: number }[]; color?: string }) {
+function BarChart({ data, color }: { data: { label: string; value: number }[]; color?: string }) {
+  const colors = useColors();
+  const styles = useStyles();
+  const barColor = color ?? colors.primary;
   const max = Math.max(1, ...data.map((d) => d.value));
   return (
     <View style={styles.chart}>
@@ -54,7 +58,7 @@ function BarChart({ data, color = colors.primary }: { data: { label: string; val
                 width: "100%",
                 borderTopLeftRadius: 4,
                 borderTopRightRadius: 4,
-                backgroundColor: color,
+                backgroundColor: barColor,
                 height: `${(d.value / max) * 100}%`,
                 minHeight: d.value > 0 ? 4 : 0,
               }}
@@ -80,6 +84,7 @@ function KpiCard({
   value: string;
   sub?: string;
 }) {
+  const styles = useStyles();
   return (
     <GlassSurface style={styles.kpi} fallbackStyle={styles.kpiFallback}>
       <View style={styles.kpiTop}>
@@ -88,13 +93,15 @@ function KpiCard({
           {label}
         </Text>
       </View>
-      <Text style={styles.kpiValue}>{value}</Text>
+      <Text style={styles.kpiValue} numberOfLines={1}>{value}</Text>
       {sub ? <Text style={styles.kpiSub}>{sub}</Text> : null}
     </GlassSurface>
   );
 }
 
 export default function StatsScreen() {
+  const colors = useColors();
+  const styles = useStyles();
   const { t, lang } = useLanguage();
   const ru = lang === "ru";
   const router = useRouter();
@@ -278,7 +285,7 @@ export default function StatsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   titleIcon: {
     padding: 10,
@@ -341,4 +348,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
     width: "100%",
   },
-});
+}));

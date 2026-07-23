@@ -32,8 +32,9 @@ import {
   Spinner,
   TogglePill,
 } from "@/components/pv/ui";
-import { alpha, colors, radius } from "@/constants/colors";
+import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
 import { useBookingMode } from "@/hooks/useBookingMode";
 import { supabase } from "@/lib/supabase";
@@ -57,6 +58,8 @@ interface MenuItem {
 const MAX_IMAGE_MB = 5;
 
 function MenuContent() {
+  const styles = useStyles();
+  const colors = useColors();
   const { t, lang } = useLanguage();
   const { provider } = useProvider();
   const { showToast } = useToast();
@@ -442,7 +445,7 @@ export default function MenuScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   backRow: { flexDirection: "row", alignItems: "center", gap: 12 },
 
   form: {
@@ -570,4 +573,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.errorContainer,
   },
   deleteConfirmText: { fontSize: 11, fontWeight: "700", color: colors.onErrorContainer },
-});
+}));

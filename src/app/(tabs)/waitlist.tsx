@@ -13,8 +13,9 @@ import {
   StatCard,
   StatusBadge,
 } from "@/components/pv/ui";
-import { alpha, colors } from "@/constants/colors";
+import { alpha } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useWaitlistEntries, type WaitlistEntry } from "@/hooks/useWaitlistEntries";
 import { localize } from "@/utils/localize";
 import { formatUzDate } from "@/utils/tashkent";
@@ -22,6 +23,8 @@ import { formatUzDate } from "@/utils/tashkent";
 const hhmm = (t: string | null) => (t ? t.slice(0, 5) : "");
 
 function WaitlistContent() {
+  const colors = useColors();
+  const styles = useStyles();
   const { t } = useLanguage();
   const { entries, loading, reload } = useWaitlistEntries();
 
@@ -175,7 +178,7 @@ export default function WaitlistScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   statsRow: { flexDirection: "row", gap: 8 },
 
   row: { padding: 16, gap: 10 },
@@ -213,4 +216,4 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     paddingLeft: 32,
   },
-});
+}));

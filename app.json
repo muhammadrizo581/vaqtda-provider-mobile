@@ -6,8 +6,8 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "vaqtdaprovidermobile",
-    "userInterfaceStyle": "dark",
-    "backgroundColor": "#0b1326",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#0c1310",
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -31,7 +31,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0b1326",
+          "backgroundColor": "#0c1310",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 100
         }

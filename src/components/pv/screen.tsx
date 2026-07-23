@@ -13,7 +13,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedLogo } from "@/components/animated-logo";
 import { liquidGlass } from "@/components/pv/ui";
-import { colors } from "@/constants/colors";
+import { makeThemedStyles } from "@/context/ThemeContext";
 
 // Shu masofagacha tortilganda indikator to'liq ko'rinadi (native trigger ~65px)
 const PULL_MAX = 72;
@@ -29,6 +29,7 @@ export function Screen({
   onRefresh?: () => void;
   scroll?: boolean;
 }) {
+  const styles = useStyles();
   const insets = useSafeAreaInsets();
   const scrollY = useSharedValue(0);
   // pulled — barmoq bilan tortilyapti; pullActive — tortib yuborilgan refresh ketyapti
@@ -112,8 +113,10 @@ export function Screen({
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  inner: { paddingHorizontal: 16, gap: 16, flexGrow: 1 },
-  refreshIndicator: { position: "absolute", alignSelf: "center", zIndex: 10 },
-});
+const useStyles = makeThemedStyles((colors) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: colors.background },
+    inner: { paddingHorizontal: 16, gap: 16, flexGrow: 1 },
+    refreshIndicator: { position: "absolute", alignSelf: "center", zIndex: 10 },
+  })
+);

@@ -26,8 +26,9 @@ import { Screen } from "@/components/pv/screen";
 import { TimeField } from "@/components/pv/time-field";
 import { useToast } from "@/components/pv/toast";
 import { Card, GlassIconButton, SmallButton, Spinner, TogglePill } from "@/components/pv/ui";
-import { alpha, colors, radius } from "@/constants/colors";
+import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
 import { useBookingMode } from "@/hooks/useBookingMode";
 import { supabase } from "@/lib/supabase";
@@ -101,6 +102,8 @@ const emptyDay = (): DaySchedule => ({ enabled: false, slots: [], breaks: [] });
 
 // ─── Component ────────────────────────────────────────────────────────────────
 function ScheduleContent() {
+  const colors = useColors();
+  const styles = useStyles();
   const { t } = useLanguage();
   const { provider } = useProvider();
   const { showToast } = useToast();
@@ -960,7 +963,7 @@ export default function ScheduleScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   title: { fontSize: 22, fontWeight: "700", color: colors.onSurface, letterSpacing: -0.5 },
   subtitle: { fontSize: 14, color: colors.onSurfaceVariant, marginTop: 4 },
 
@@ -1250,4 +1253,4 @@ const styles = StyleSheet.create({
     color: colors.onSurface,
   },
   bufferText: { fontSize: 12, fontWeight: "700" },
-});
+}));
