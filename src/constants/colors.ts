@@ -1,40 +1,39 @@
-// "Zumrad" dizayn tokenlari — dizayn-reference: Vaqtda Midnight Slate.dc.html (Zumrad palitra).
+// "Grafit Moviy" dizayn tokenlari — yer butunlay neytral grafit, moviy faqat aksent.
 // Komponentlarda hex yozish taqiqlangan: faqat shu tokenlar ishlatiladi.
 // Faol palitra ThemeContext'dagi useColors() orqali olinadi — bu fayldan
 // to'g'ridan-to'g'ri palitra import qilinmaydi (dark/light almashinuvi uchun).
 
 // Dark palitra — asosiy (default) tema.
 export const darkColors = {
-  background: "#0c1310",
-  surface: "#0c1310",
-  onSurface: "#e2efe6",
-  onSurfaceVariant: "#c4d0c6",
+  background: "#0e1113",
+  surface: "#0e1113",
+  onSurface: "#e9edef",
+  onSurfaceVariant: "#9ba4aa",
 
-  surfaceContainerLowest: "#070d0a",
-  surfaceContainerLow: "#121b16",
-  surfaceContainer: "#16211b",
-  surfaceContainerHigh: "#1f2d25",
-  surfaceContainerHighest: "#2a3b31",
-  surfaceVariant: "#2a3b31",
+  surfaceContainerLowest: "#0a0c0e",
+  surfaceContainerLow: "#14171a",
+  surfaceContainer: "#171b1e",
+  surfaceContainerHigh: "#1e2327",
+  surfaceContainerHighest: "#262c30",
+  surfaceVariant: "#262c30",
 
-  outline: "#8fa094",
-  outlineVariant: "#3e4e44",
+  outline: "#8f9aa0",
+  outlineVariant: "#2b3237",
 
-  primary: "#3ecf8e", // zumrad
-  // MUHIM: dark'da oq emas — to'q yashil (yorqin zumrad fonda oq matn kontrasti yetmaydi)
-  onPrimary: "#052e1c",
-  primaryContainer: "#3ecf8e",
-  onPrimaryContainer: "#052e1c",
+  primary: "#3b82f6", // moviy (yashil aksent rad etildi — grafit fonda tiniq ko'k)
+  onPrimary: "#ffffff",
+  primaryContainer: "#3b82f6",
+  onPrimaryContainer: "#ffffff",
 
   secondary: "#e8c06a", // oltin (kutilmoqda statuslari)
   onSecondary: "#3d2e00",
   secondaryContainer: "#d4a034",
 
-  tertiary: "#ff9d80", // marjon (tasdiq kutilmoqda)
+  tertiary: "#f0876a", // marjon (tasdiq kutilmoqda)
   onTertiary: "#4a1500",
   tertiaryContainer: "#e6693c",
 
-  error: "#ffb4ab",
+  error: "#f28b80",
   onError: "#690005",
   errorContainer: "#93000a",
   onErrorContainer: "#ffdad6",
@@ -42,24 +41,24 @@ export const darkColors = {
 
 // Light palitra — dark bilan bir xil kalitlar, qiymatlar light rejim uchun.
 export const lightColors: Colors = {
-  background: "#f4f4ee",
+  background: "#f4f5f5",
   surface: "#ffffff",
-  onSurface: "#1a201c",
-  onSurfaceVariant: "#4f5951",
+  onSurface: "#181c1e",
+  onSurfaceVariant: "#4f585d",
 
   surfaceContainerLowest: "#ffffff",
-  surfaceContainerLow: "#edeee6",
+  surfaceContainerLow: "#eceeef",
   surfaceContainer: "#ffffff",
-  surfaceContainerHigh: "#e7e9e0",
-  surfaceContainerHighest: "#dadcd1",
-  surfaceVariant: "#dadcd1",
+  surfaceContainerHigh: "#e5e8ea",
+  surfaceContainerHighest: "#d8dcde",
+  surfaceVariant: "#d8dcde",
 
-  outline: "#717d74",
-  outlineVariant: "#d3d8cf",
+  outline: "#70797e",
+  outlineVariant: "#d0d6d9",
 
-  primary: "#0e7a4a", // to'q zumrad
-  onPrimary: "#ffffff", // light'da oq matn qaytadi
-  primaryContainer: "#0e7a4a",
+  primary: "#1e66c7", // to'q moviy
+  onPrimary: "#ffffff",
+  primaryContainer: "#1e66c7",
   onPrimaryContainer: "#ffffff",
 
   secondary: "#8a6510",

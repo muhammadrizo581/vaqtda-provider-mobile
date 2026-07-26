@@ -46,6 +46,8 @@ function RootNavigator() {
             <Stack.Screen name="services" />
             <Stack.Screen name="menu" />
             <Stack.Screen name="business-profile" />
+            <Stack.Screen name="cards" />
+            <Stack.Screen name="payment-settings" />
             <Stack.Screen name="chat/[id]" />
           </Stack.Protected>
           <Stack.Protected guard={!isProvider}>

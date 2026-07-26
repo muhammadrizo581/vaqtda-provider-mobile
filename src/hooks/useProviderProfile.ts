@@ -18,6 +18,10 @@ export interface ProviderProfile {
   is_active: boolean;
   phone_number?: string | null;
   region_id?: string | null;
+  // To'lov sozlamalari (payment-settings sahifasi boshqaradi)
+  prepayment_type?: "none" | "percent" | "fixed" | "full" | null;
+  prepayment_percent?: number | null;
+  prepayment_amount?: number | null;
 }
 
 export function useProviderProfile() {

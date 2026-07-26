@@ -6,12 +6,14 @@ import {
   BarChart3,
   CalendarDays,
   ChevronRight,
+  CreditCard,
   LogIn,
   Monitor,
   Settings,
   Store,
   Tag,
   UtensilsCrossed,
+  Wallet,
   type LucideIcon,
 } from "lucide-react-native";
 import React from "react";
@@ -95,6 +97,22 @@ export default function MoreScreen() {
           },
         ]
       : []),
+    {
+      key: "cards",
+      icon: CreditCard,
+      title: t("pv.more_cards"),
+      subtitle: t("pv.more_cards_sub"),
+      href: "/cards" as Href,
+      tone: "primary",
+    },
+    {
+      key: "paycfg",
+      icon: Wallet,
+      title: t("pv.more_paycfg"),
+      subtitle: t("pv.more_paycfg_sub"),
+      href: "/payment-settings" as Href,
+      tone: "secondary",
+    },
     {
       key: "stats",
       icon: BarChart3,
