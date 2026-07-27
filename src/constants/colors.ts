@@ -1,29 +1,30 @@
-// "Grafit Moviy" dizayn tokenlari — yer butunlay neytral grafit, moviy faqat aksent.
+// "Yashil Grafit" dizayn tokenlari — yer yengil yashil-grafit, yashil aksent.
+// Mijoz ilovasi (vaqtda-mobile) palitrasiga moslangan: primary yashil.
 // Komponentlarda hex yozish taqiqlangan: faqat shu tokenlar ishlatiladi.
 // Faol palitra ThemeContext'dagi useColors() orqali olinadi — bu fayldan
 // to'g'ridan-to'g'ri palitra import qilinmaydi (dark/light almashinuvi uchun).
 
 // Dark palitra — asosiy (default) tema.
 export const darkColors = {
-  background: "#0e1113",
-  surface: "#0e1113",
-  onSurface: "#e9edef",
-  onSurfaceVariant: "#9ba4aa",
+  background: "#0f1311",
+  surface: "#0f1311",
+  onSurface: "#ecefea",
+  onSurfaceVariant: "#98a29a",
 
-  surfaceContainerLowest: "#0a0c0e",
-  surfaceContainerLow: "#14171a",
-  surfaceContainer: "#171b1e",
-  surfaceContainerHigh: "#1e2327",
-  surfaceContainerHighest: "#262c30",
-  surfaceVariant: "#262c30",
+  surfaceContainerLowest: "#0a0d0b",
+  surfaceContainerLow: "#141a16",
+  surfaceContainer: "#181e1a",
+  surfaceContainerHigh: "#1f2721",
+  surfaceContainerHighest: "#27302a",
+  surfaceVariant: "#27302a",
 
-  outline: "#8f9aa0",
-  outlineVariant: "#2b3237",
+  outline: "#8a968c",
+  outlineVariant: "#2a332c",
 
-  primary: "#3b82f6", // moviy (yashil aksent rad etildi — grafit fonda tiniq ko'k)
-  onPrimary: "#ffffff",
-  primaryContainer: "#3b82f6",
-  onPrimaryContainer: "#ffffff",
+  primary: "#7bae85", // yashil aksent (mijoz ilovasi dark primary) — och yashil, qorong'i fonda tiniq
+  onPrimary: "#0f1311", // och yashil to'ldirish ustida qorong'i siyoh
+  primaryContainer: "#7bae85",
+  onPrimaryContainer: "#0f1311",
 
   secondary: "#e8c06a", // oltin (kutilmoqda statuslari)
   onSecondary: "#3d2e00",
@@ -41,24 +42,24 @@ export const darkColors = {
 
 // Light palitra — dark bilan bir xil kalitlar, qiymatlar light rejim uchun.
 export const lightColors: Colors = {
-  background: "#f4f5f5",
+  background: "#f6f7f5",
   surface: "#ffffff",
-  onSurface: "#181c1e",
-  onSurfaceVariant: "#4f585d",
+  onSurface: "#181d19",
+  onSurfaceVariant: "#6b7280",
 
   surfaceContainerLowest: "#ffffff",
-  surfaceContainerLow: "#eceeef",
+  surfaceContainerLow: "#eff1ee",
   surfaceContainer: "#ffffff",
-  surfaceContainerHigh: "#e5e8ea",
-  surfaceContainerHighest: "#d8dcde",
-  surfaceVariant: "#d8dcde",
+  surfaceContainerHigh: "#e8ebe7",
+  surfaceContainerHighest: "#dee3dd",
+  surfaceVariant: "#dee3dd",
 
-  outline: "#70797e",
-  outlineVariant: "#d0d6d9",
+  outline: "#7b857d",
+  outlineVariant: "#e5e7eb",
 
-  primary: "#1e66c7", // to'q moviy
+  primary: "#4c8156", // to'q yashil (mijoz ilovasi light primary)
   onPrimary: "#ffffff",
-  primaryContainer: "#1e66c7",
+  primaryContainer: "#4c8156",
   onPrimaryContainer: "#ffffff",
 
   secondary: "#8a6510",
