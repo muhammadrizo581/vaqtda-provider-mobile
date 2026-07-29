@@ -7,11 +7,22 @@ import { AppState, Platform } from "react-native";
 const SUPABASE_URL = "https://ujpitkwdmbgjfqjcohxf.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_PQMtwUbuLKNLqWbGM8E1dQ_SOvqnrwc";
 
+// Expo Router web output runs this module on the Node SSR renderer too, where
+// `window` doesn't exist — AsyncStorage's web impl touches window.localStorage
+// and crashes the server bundle if used there.
+const isServerRenderer = Platform.OS === "web" && typeof window === "undefined";
+
+const noopStorage = {
+  getItem: async () => null,
+  setItem: async () => {},
+  removeItem: async () => {},
+};
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
+    storage: isServerRenderer ? noopStorage : AsyncStorage,
+    autoRefreshToken: !isServerRenderer,
+    persistSession: !isServerRenderer,
     detectSessionInUrl: false,
   },
 });
