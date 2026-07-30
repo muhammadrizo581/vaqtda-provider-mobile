@@ -31,7 +31,7 @@ import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useAppointments, type Appointment } from "@/hooks/useAppointments";
 import { localize } from "@/utils/localize";
 import { formatSom } from "@/utils/price";
-import { createTashkentClock, formatUzDate, UZ_WEEKDAYS, weekdayKeyOf } from "@/utils/tashkent";
+import { addDaysStr, createTashkentClock, formatUzDate, UZ_WEEKDAYS, weekdayKeyOf } from "@/utils/tashkent";
 
 const tashkentClock = createTashkentClock();
 const hhmm = (t: string) => (t || "").slice(0, 5);
@@ -43,22 +43,99 @@ const dayCount = (from: string, to: string) => {
   return Math.max(1, Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000));
 };
 
+// Bron shu kunga tegishlimi (kunlik bronda kelish–ketish oralig'i ham hisobga olinadi)
+const spansDay = (a: Appointment, d: string) => {
+  const to = a.date_to && a.date_to > a.booking_date ? a.date_to : a.booking_date;
+  return a.booking_date <= d && d <= to;
+};
+
 type StatusFilter = "all" | "upcoming" | "completed" | "cancelled";
+
+// Kun tabi — Bugun / Ertaga / keyingi bronli kunlar (liquid glass, fallback bilan)
+function DayTab({
+  label,
+  sub,
+  count,
+  active,
+  onPress,
+}: {
+  label: string;
+  sub?: string;
+  count?: number;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const styles = useStyles();
+  const colors = useColors();
+  const fg = active ? colors.onPrimary : colors.onSurface;
+  const fgMuted = active ? alpha(colors.onPrimary, 0.75) : colors.onSurfaceVariant;
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
+      <GlassSurface
+        interactive
+        tintColor={active ? colors.primary : undefined}
+        style={styles.dayTab}
+        fallbackStyle={[
+          styles.dayTabFallback,
+          active && { backgroundColor: colors.primary, borderColor: colors.primary },
+        ]}
+      >
+        <View style={styles.dayTabLabelRow}>
+          <Text style={[styles.dayTabLabel, { color: fg }]}>{label}</Text>
+          {count != null && count > 0 ? (
+            <View
+              style={[
+                styles.dayTabCount,
+                { backgroundColor: active ? alpha(colors.onPrimary, 0.22) : alpha(colors.primaryContainer, 0.25) },
+              ]}
+            >
+              <Text style={[styles.dayTabCountText, { color: active ? colors.onPrimary : colors.primary }]}>
+                {count}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+        {sub ? <Text style={[styles.dayTabSub, { color: fgMuted }]}>{sub}</Text> : null}
+      </GlassSurface>
+    </Pressable>
+  );
+}
 
 function AppointmentsContent() {
   const colors = useColors();
   const styles = useStyles();
   const { t, lang } = useLanguage();
   const { appointments, loading, reload, act } = useAppointments();
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const today = tashkentClock.now().dateStr;
+  const tomorrow = addDaysStr(today, 1);
+
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("upcoming");
+  const [dayFilter, setDayFilter] = useState<string>(today);
   const [query, setQuery] = useState("");
   const [actingId, setActingId] = useState<string | null>(null);
 
-  const today = tashkentClock.now().dateStr;
+  // Tepadagi kun tablari: Bugun, Ertaga + keyingi bronli kunlar
+  const dayTabs = useMemo(() => {
+    const countOn = (d: string) => appointments.filter((a) => spansDay(a, d)).length;
+    const extraDates = [...new Set(appointments.map((a) => a.booking_date))]
+      .filter((d) => d > tomorrow)
+      .sort();
+    return [
+      { key: today, label: t("date.today"), sub: formatUzDate(today), count: countOn(today) },
+      { key: tomorrow, label: t("date.tomorrow"), sub: formatUzDate(tomorrow), count: countOn(tomorrow) },
+      ...extraDates.map((d) => ({
+        key: d,
+        label: UZ_WEEKDAYS[weekdayKeyOf(d)],
+        sub: formatUzDate(d),
+        count: countOn(d),
+      })),
+    ];
+  }, [appointments, today, tomorrow, t]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     return appointments.filter((a) => {
+      if (!spansDay(a, dayFilter)) return false;
       if (statusFilter !== "all" && a.status !== statusFilter) return false;
       if (q) {
         const name = (a.client?.full_name || "").toLowerCase();
@@ -68,7 +145,7 @@ function AppointmentsContent() {
       }
       return true;
     });
-  }, [appointments, statusFilter, query, lang]);
+  }, [appointments, dayFilter, statusFilter, query, lang]);
 
   // Sana bo'yicha guruhlash: kelgusilar (bugundan) o'sish tartibida,
   // o'tganlar kamayish tartibida — eng dolzarbi tepada.
@@ -99,8 +176,8 @@ function AppointmentsContent() {
   const statusBar = (s: string) =>
     s === "upcoming" ? colors.primary : s === "completed" ? colors.secondary : alpha(colors.error, 0.6);
 
+  // "Barchasi" alohida — o'ng chekkada qalqib turadi, qolganlari skroll bo'ladi
   const FILTERS: { key: StatusFilter; label: string }[] = [
-    { key: "all", label: t("pv.filter_all") },
     { key: "upcoming", label: t("pv.status_upcoming") },
     { key: "completed", label: t("pv.status_completed") },
     { key: "cancelled", label: t("pv.status_cancelled") },
@@ -109,8 +186,9 @@ function AppointmentsContent() {
   const handleAct = (a: Appointment, action: "cancel" | "complete") => {
     const run = async () => {
       setActingId(a.id);
-      await act(a.id, action);
+      const ok = await act(a.id, action);
       setActingId(null);
+      if (!ok) Alert.alert(t("pv.act_failed"));
     };
     if (action === "cancel") {
       Alert.alert(t("pv.cancel_booking"), t("pv.confirm_cancel"), [
@@ -126,6 +204,25 @@ function AppointmentsContent() {
     <Screen refreshing={loading} onRefresh={reload}>
       <PageHeader title={t("pv.appts_title")} subtitle={t("pv.appts_sub")} />
 
+      {/* Kun tablari: Barchasi / Bugun / Ertaga / keyingi bronli kunlar */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ gap: 8 }}
+      >
+        {dayTabs.map((d) => (
+          <DayTab
+            key={d.key}
+            label={d.label}
+            sub={d.sub}
+            count={d.count}
+            active={dayFilter === d.key}
+            onPress={() => setDayFilter(d.key)}
+          />
+        ))}
+      </ScrollView>
+
       {/* Qidiruv — iOS 26 da shisha yuzali qidiruv paneli */}
       <GlassSurface style={styles.searchWrap} fallbackStyle={styles.searchFallback}>
         <Search size={16} color={colors.onSurfaceVariant} />
@@ -138,17 +235,31 @@ function AppointmentsContent() {
         />
       </GlassSurface>
 
-      {/* Status filtri */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-        {FILTERS.map((f) => (
+      {/* Status filtri — "Barchasi" o'ng chekkada, qatorning ustida qalqib turadi */}
+      <View style={styles.statusRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flexGrow: 0 }}
+          contentContainerStyle={{ gap: 8, paddingRight: 104 }}
+        >
+          {FILTERS.map((f) => (
+            <FilterPill
+              key={f.key}
+              label={f.label}
+              active={statusFilter === f.key}
+              onPress={() => setStatusFilter(f.key)}
+            />
+          ))}
+        </ScrollView>
+        <View style={styles.allPillWrap} pointerEvents="box-none">
           <FilterPill
-            key={f.key}
-            label={f.label}
-            active={statusFilter === f.key}
-            onPress={() => setStatusFilter(f.key)}
+            label={t("pv.filter_all")}
+            active={statusFilter === "all"}
+            onPress={() => setStatusFilter("all")}
           />
-        ))}
-      </ScrollView>
+        </View>
+      </View>
 
       {/* Ro'yxat */}
       {loading ? (
@@ -321,6 +432,49 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     borderColor: colors.outlineVariant,
   },
   searchInput: { flex: 1, paddingVertical: 10, fontSize: 14, color: colors.onSurface },
+
+  statusRow: { position: "relative" },
+  allPillWrap: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    zIndex: 10,
+    // Qalqib turgan pill — ostidagi pill'lardan ajralib ko'rinsin
+    shadowColor: "#000",
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: -2, height: 2 },
+    elevation: 8,
+  },
+
+  dayTab: {
+    minHeight: 54,
+    minWidth: 84,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 18,
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  dayTabFallback: {
+    backgroundColor: colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  dayTabLabelRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  dayTabLabel: { fontSize: 13, fontWeight: "700" },
+  dayTabSub: { fontSize: 11, marginTop: 2, fontWeight: "500" },
+  dayTabCount: {
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dayTabCountText: { fontSize: 10, fontWeight: "700" },
 
   groupHeader: {
     paddingHorizontal: 16,

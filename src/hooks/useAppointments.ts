@@ -114,12 +114,15 @@ export function useAppointments() {
   const act = useCallback(
     async (id: string, action: "cancel" | "complete") => {
       const status = action === "cancel" ? "cancelled" : "completed";
-      const { error: err } = await supabase
+      // .select() — RLS jim rad etsa (0 qator) ham aniqlaymiz, aks holda UI
+      // o'zgargan bo'lib ko'rinib, refresh'da eski holatga qaytib qolardi
+      const { data, error: err } = await supabase
         .from("bookings")
         .update({ status, updated_at: new Date().toISOString() })
         .eq("id", id)
-        .eq("provider_id", provider?.id || "");
-      if (err) return false;
+        .eq("provider_id", provider?.id || "")
+        .select("id");
+      if (err || !data || data.length === 0) return false;
       setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
       return true;
     },

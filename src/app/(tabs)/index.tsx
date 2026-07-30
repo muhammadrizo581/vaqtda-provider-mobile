@@ -6,52 +6,162 @@ import {
   BarChart3,
   CalendarClock,
   CalendarDays,
-  CheckCircle2,
+  ChevronRight,
   Hourglass,
   Settings,
-  X,
+  TrendingDown,
+  TrendingUp,
+  Trophy,
+  Users,
 } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
-import { AnimatedLogo } from "@/components/animated-logo";
+import React, { useEffect, useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import Svg, { Circle } from "react-native-svg";
 import { BusinessGate } from "@/components/pv/business-gate";
+import { MonthOverviewModal } from "@/components/pv/month-overview";
 import { Screen } from "@/components/pv/screen";
 import {
   ClientAvatar,
-  EmptyState,
   GlassIconButton,
-  SmallButton,
+  GlassSurface,
   Spinner,
-  StatusBadge,
 } from "@/components/pv/ui";
 import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { useProvider } from "@/context/ProviderContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useAppointments, type Appointment } from "@/hooks/useAppointments";
 import { useWaitlistEntries } from "@/hooks/useWaitlistEntries";
-import { localize } from "@/utils/localize";
+import { supabase } from "@/lib/supabase";
 import { formatSom } from "@/utils/price";
-import { createTashkentClock } from "@/utils/tashkent";
+import { addDaysStr, createTashkentClock, formatUzDate } from "@/utils/tashkent";
 
 const tashkentClock = createTashkentClock();
 
+// "HH:MM[:SS]" -> daqiqa
+const toMin = (t?: string | null) => {
+  if (!t) return 0;
+  const [h, m] = t.split(":").map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+// Bugungi jadval slotlari — bandlik foizi uchun
+function useTodaySlots(today: string) {
+  const { provider } = useProvider();
+  const providerId = provider?.id;
+  const [slots, setSlots] = useState<{ start_time: string; end_time: string }[]>([]);
+  useEffect(() => {
+    if (!providerId) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from("timetable_slots")
+        .select("start_time, end_time")
+        .eq("provider_id", providerId)
+        .eq("slot_date", today);
+      if (!cancelled) setSlots((data as { start_time: string; end_time: string }[]) || []);
+    }, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [providerId, today]);
+  return slots;
+}
+
+// Halqa indikator — bugungi bandlik foizi
+function ProgressRing({
+  size = 44,
+  stroke = 5,
+  progress,
+  color,
+  track,
+  children,
+}: {
+  size?: number;
+  stroke?: number;
+  progress: number; // 0..1
+  color: string;
+  track: string;
+  children?: React.ReactNode;
+}) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  return (
+    <View style={{ width: size, height: size, alignItems: "center", justifyContent: "center" }}>
+      <Svg width={size} height={size} style={StyleSheet.absoluteFill}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={track} strokeWidth={stroke} fill="none" />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={r}
+          stroke={color}
+          strokeWidth={stroke}
+          fill="none"
+          strokeDasharray={`${c}`}
+          strokeDashoffset={c * (1 - Math.min(1, Math.max(0, progress)))}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      {children}
+    </View>
+  );
+}
+
 const hhmm = (t: string) => (t || "").slice(0, 5);
 
-// Bron holati → badge toni
-function statusTone(status: string): "secondary" | "primary" | "muted" | "error" {
-  if (status === "upcoming") return "secondary";
-  if (status === "completed") return "primary";
-  if (status === "cancelled") return "error";
-  return "muted";
+// Ixcham ustunli grafik — 7 kunlik daromad (Screen Time uslubida bosiladigan)
+function MiniBars({
+  data,
+  color,
+  track,
+  selected,
+  onSelect,
+}: {
+  data: { label: string; value: number }[];
+  color: string;
+  track: string;
+  selected?: number | null;
+  onSelect?: (i: number) => void;
+}) {
+  const styles = useStyles();
+  const max = Math.max(1, ...data.map((d) => d.value));
+  return (
+    <View style={styles.miniChart}>
+      {data.map((d, i) => {
+        const dim = selected != null && selected !== i;
+        return (
+          <Pressable key={i} style={styles.miniCol} onPress={() => onSelect?.(i)} hitSlop={4}>
+            <View style={styles.miniBarWrap}>
+              <View
+                style={{
+                  width: "100%",
+                  borderRadius: 4,
+                  backgroundColor: d.value > 0 ? (dim ? alpha(color, 0.25) : color) : track,
+                  height: d.value > 0 ? `${Math.max(6, (d.value / max) * 100)}%` : 4,
+                }}
+              />
+            </View>
+            <Text
+              style={[styles.miniLabel, selected === i && { color, fontWeight: "800" }]}
+              numberOfLines={1}
+            >
+              {d.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
 
 function OverviewContent() {
   const colors = useColors();
   const styles = useStyles();
-  const { t, lang } = useLanguage();
-  const { appointments, loading, reload, act } = useAppointments();
+  const { t } = useLanguage();
+  const { appointments, loading, reload } = useAppointments();
   const { entries: waitlist, reload: reloadWaitlist } = useWaitlistEntries();
-  const [actingId, setActingId] = useState<string | null>(null);
   const router = useRouter();
 
   const now = tashkentClock.now();
@@ -77,80 +187,128 @@ function OverviewContent() {
     return { todayCount: todayActive.length, earnings, upcoming, activeWaitlist };
   }, [todays, appointments, waitlist, today]);
 
-  // Spotlight: hali tugamagan eng yaqin bron; hammasi o'tib ketgan bo'lsa — birinchi kutilayotgani
-  const next = useMemo(
+  // ── Statistika bo'limi hisob-kitoblari ──
+  const todaySlots = useTodaySlots(today);
+
+  // Bugungi bandlik: band daqiqalar / jadvaldagi ochiq daqiqalar
+  const occupancy = useMemo(() => {
+    const availMin = todaySlots.reduce(
+      (s, sl) => s + Math.max(0, toMin(sl.end_time) - toMin(sl.start_time)),
+      0
+    );
+    if (availMin <= 0) return null;
+    const bookedMin = todays
+      .filter((a) => a.status !== "cancelled")
+      .reduce((s, a) => s + (a.duration_minutes || Math.max(0, toMin(a.end_time) - toMin(a.start_time))), 0);
+    return Math.min(100, Math.round((bookedMin / availMin) * 100));
+  }, [todaySlots, todays]);
+
+  const monthStats = useMemo(() => {
+    const ym = today.slice(0, 7); // "2026-07"
+    const dayN = Number(today.slice(8, 10));
+    const [yy, mm] = ym.split("-").map(Number);
+    const prevYm = mm === 1 ? `${yy - 1}-12` : `${yy}-${String(mm - 1).padStart(2, "0")}`;
+
+    const inMonth = appointments.filter((a) => a.booking_date.startsWith(ym));
+    const active = inMonth.filter((a) => a.status !== "cancelled");
+    const completedM = inMonth.filter((a) => a.status === "completed");
+    const cancelledCount = inMonth.length - active.length;
+
+    const revenue = completedM.reduce((s, a) => s + (a.price || 0), 0);
+    // Adolatli taqqoslash: o'tgan oyning ham faqat 1..bugungi kun oralig'i olinadi
+    const prevRevenue = appointments
+      .filter(
+        (a) =>
+          a.status === "completed" &&
+          a.booking_date.startsWith(prevYm) &&
+          Number(a.booking_date.slice(8, 10)) <= dayN
+      )
+      .reduce((s, a) => s + (a.price || 0), 0);
+    const change = prevRevenue > 0 ? Math.round(((revenue - prevRevenue) / prevRevenue) * 100) : null;
+
+    const clients = new Set(active.map((a) => a.client_id)).size;
+    const cancelRate = inMonth.length > 0 ? Math.round((cancelledCount / inMonth.length) * 100) : 0;
+
+    // Oxirgi 7 kun daromadi (yakunlangan bronlar)
+    const week = Array.from({ length: 7 }, (_, i) => {
+      const d = addDaysStr(today, i - 6);
+      const dayBk = appointments.filter((a) => a.booking_date === d);
+      const v = dayBk
+        .filter((a) => a.status === "completed")
+        .reduce((s, a) => s + (a.price || 0), 0);
+      return {
+        date: d,
+        label: String(Number(d.slice(8, 10))),
+        value: v,
+        count: dayBk.filter((a) => a.status !== "cancelled").length,
+      };
+    });
+    const weekTotal = week.reduce((s, d) => s + d.value, 0);
+    const weekCount = week.reduce((s, d) => s + d.count, 0);
+
+    // Rekord kun — eng yuqori kunlik daromad (butun tarix bo'yicha)
+    const byDay = new Map<string, number>();
+    appointments.forEach((a) => {
+      if (a.status === "completed" && a.price)
+        byDay.set(a.booking_date, (byDay.get(a.booking_date) || 0) + a.price);
+    });
+    let recordDate: string | null = null;
+    let recordSum = 0;
+    byDay.forEach((v, d) => {
+      if (v > recordSum) {
+        recordSum = v;
+        recordDate = d;
+      }
+    });
+
+    // Bu oy eng ko'p kelgan mijozlar
+    const byClient = new Map<string, { count: number; spend: number; client: Appointment["client"] }>();
+    active.forEach((a) => {
+      const cur = byClient.get(a.client_id) || { count: 0, spend: 0, client: a.client };
+      cur.count += 1;
+      cur.spend += a.price || 0;
+      if (!cur.client) cur.client = a.client;
+      byClient.set(a.client_id, cur);
+    });
+    const topClients = [...byClient.values()]
+      .sort((x, y) => y.count - x.count || y.spend - x.spend)
+      .slice(0, 3);
+
+    return {
+      revenue,
+      change,
+      clients,
+      bookings: active.length,
+      cancelledCount,
+      cancelRate,
+      week,
+      weekTotal,
+      weekCount,
+      recordDate,
+      recordSum,
+      topClients,
+    };
+  }, [appointments, today]);
+
+  // Oylik kalendar (heatmap) oynasi
+  const [calOpen, setCalOpen] = useState(false);
+
+  // Grafikda tanlangan kun (Screen Time uslubi)
+  const [selectedDayIdx, setSelectedDayIdx] = useState<number | null>(null);
+  const selDay = selectedDayIdx != null ? monthStats.week[selectedDayIdx] : null;
+  const selBookings = useMemo(
     () =>
-      todays.find((a) => a.status === "upcoming" && hhmm(a.end_time) >= now.hhmm) ??
-      todays.find((a) => a.status === "upcoming"),
-    [todays, now.hhmm]
+      selDay
+        ? appointments
+            .filter((a) => a.booking_date === selDay.date)
+            .sort((a, b) => a.start_time.localeCompare(b.start_time))
+        : [],
+    [appointments, selDay]
   );
-  const timeline = useMemo(() => todays.filter((a) => a.id !== next?.id), [todays, next]);
 
   const hour = Number(now.hhmm.slice(0, 2));
   const greeting =
     hour < 12 ? t("pv.greet_morning") : hour < 18 ? t("pv.greet_day") : t("pv.greet_evening");
-
-  const statusLabel = (s: string) =>
-    s === "upcoming"
-      ? t("pv.status_upcoming")
-      : s === "completed"
-        ? t("pv.status_completed")
-        : t("pv.status_cancelled");
-
-  const serviceLine = (a: Appointment) => {
-    const parts = [localize(a.services?.name, lang) || "—"];
-    if (a.duration_minutes) parts.push(`${a.duration_minutes} ${t("common.min")}`);
-    if (a.price) parts.push(`${formatSom(a.price)} ${t("pv.som")}`);
-    return parts.join(" · ");
-  };
-
-  const dotColor = (s: string) =>
-    s === "upcoming"
-      ? colors.secondary
-      : s === "completed"
-        ? colors.primary
-        : s === "cancelled"
-          ? colors.error
-          : colors.outline;
-
-  const handleAct = (a: Appointment, action: "cancel" | "complete") => {
-    const run = async () => {
-      setActingId(a.id);
-      await act(a.id, action);
-      setActingId(null);
-    };
-    if (action === "cancel") {
-      Alert.alert(t("pv.cancel_booking"), t("pv.confirm_cancel"), [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("common.confirm"), style: "destructive", onPress: run },
-      ]);
-    } else {
-      run();
-    }
-  };
-
-  const renderActions = (a: Appointment) =>
-    actingId === a.id ? (
-      <View style={{ alignItems: "center", paddingVertical: 4 }}>
-        <AnimatedLogo variant="loading" size={20} background={null} foreground={colors.primary} />
-      </View>
-    ) : (
-      <View style={styles.actionsRow}>
-        <SmallButton
-          label={t("pv.cancel_booking")}
-          icon={X}
-          variant="outline"
-          onPress={() => handleAct(a, "cancel")}
-          style={{ flex: 1 }}
-        />
-        <SmallButton
-          label={t("pv.complete")}
-          icon={CheckCircle2}
-          onPress={() => handleAct(a, "complete")}
-          style={{ flex: 1 }}
-        />
-      </View>
-    );
 
   return (
     <Screen
@@ -217,78 +375,225 @@ function OverviewContent() {
         </View>
       </View>
 
-      {/* Keyingi bron — spotlight */}
-      {next ? (
-        <View style={styles.nextCard}>
-          <Text style={styles.nextLabel}>{t("pv.next_booking")}</Text>
-          <View style={styles.nextRow}>
-            <View>
-              <Text style={styles.nextTime}>{hhmm(next.start_time)}</Text>
-              <Text style={styles.nextTimeEnd}>{hhmm(next.end_time)}</Text>
-            </View>
-            <View style={styles.nextDivider} />
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.apptName} numberOfLines={1}>
-                {next.client?.full_name || "—"}
-              </Text>
-              <Text style={styles.apptService} numberOfLines={2}>
-                {serviceLine(next)}
-              </Text>
-            </View>
-            <ClientAvatar
-              name={next.client?.full_name || null}
-              avatarUrl={next.client?.avatar_url}
-              size={40}
-            />
-          </View>
-          {renderActions(next)}
-        </View>
-      ) : null}
-
-      {/* Bugungi jadval — vaqt izi bo'ylab */}
-      <View>
+      {/* ── Statistika ── */}
+      {loading ? (
+        <Spinner />
+      ) : (
+      <View style={{ gap: 12 }}>
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>{t("pv.today_schedule")}</Text>
-          <Pressable onPress={() => router.push("/(tabs)/appointments")}>
+          <Text style={styles.sectionTitle}>{t("pv.stats_title")}</Text>
+          <Pressable onPress={() => router.push("/stats")}>
             <Text style={styles.viewAll}>{t("pv.view_all")} →</Text>
           </Pressable>
         </View>
 
-        {loading ? (
-          <Spinner />
-        ) : todays.length === 0 ? (
-          <EmptyState icon={CalendarDays} title={t("pv.empty_today")} />
-        ) : (
-          timeline.map((a, i) => (
-            <View key={a.id} style={styles.tlRow}>
-              <Text
-                style={[styles.tlTime, a.status !== "upcoming" && { color: colors.onSurfaceVariant }]}
+        {/* Oylik hisobot */}
+        <GlassSurface style={styles.monthCard} fallbackStyle={styles.monthCardFallback}>
+          <View style={styles.monthTopRow}>
+            <Text style={styles.monthLabel}>{t("pv.month_title")}</Text>
+            {monthStats.change !== null ? (
+              <View
+                style={[
+                  styles.changeBadge,
+                  {
+                    backgroundColor:
+                      monthStats.change >= 0 ? alpha(colors.primaryContainer, 0.25) : alpha(colors.errorContainer, 0.3),
+                  },
+                ]}
               >
-                {hhmm(a.start_time)}
-              </Text>
-              <View style={styles.tlRail}>
-                <View style={[styles.tlDot, { backgroundColor: dotColor(a.status) }]} />
-                {i < timeline.length - 1 ? <View style={styles.tlLine} /> : null}
+                {monthStats.change >= 0 ? (
+                  <TrendingUp size={12} color={colors.primary} />
+                ) : (
+                  <TrendingDown size={12} color={colors.error} />
+                )}
+                <Text
+                  style={[
+                    styles.changeBadgeText,
+                    { color: monthStats.change >= 0 ? colors.primary : colors.error },
+                  ]}
+                >
+                  {Math.abs(monthStats.change)}%
+                </Text>
               </View>
-              <View style={[styles.tlCard, a.status === "cancelled" && { opacity: 0.55 }]}>
-                <View style={styles.tlCardTop}>
-                  <ClientAvatar name={a.client?.full_name || null} avatarUrl={a.client?.avatar_url} />
-                  <View style={{ flex: 1, minWidth: 0 }}>
-                    <Text style={styles.apptName} numberOfLines={1}>
+            ) : null}
+          </View>
+          <View style={styles.monthValueRow}>
+            <Text style={styles.monthValue} numberOfLines={1} adjustsFontSizeToFit>
+              {monthStats.revenue > 0 ? formatSom(monthStats.revenue) : "0"}
+            </Text>
+            <Text style={styles.monthSuffix}>{t("pv.som")}</Text>
+          </View>
+          {monthStats.change !== null ? (
+            <Text style={styles.monthVsPrev}>{t("pv.month_vs_prev")}</Text>
+          ) : null}
+          <View style={styles.monthMetaRow}>
+            <View style={styles.monthMeta}>
+              <Users size={14} color={colors.onSurfaceVariant} />
+              <Text style={styles.monthMetaValue}>{monthStats.clients}</Text>
+              <Text style={styles.monthMetaLabel}>{t("stats.clients")}</Text>
+            </View>
+            <View style={styles.monthMetaDivider} />
+            <View style={styles.monthMeta}>
+              <CalendarDays size={14} color={colors.onSurfaceVariant} />
+              <Text style={styles.monthMetaValue}>{monthStats.bookings}</Text>
+              <Text style={styles.monthMetaLabel}>{t("stats.bookings")}</Text>
+            </View>
+          </View>
+        </GlassSurface>
+
+        {/* Mini ko'rsatkichlar: bandlik / bekor qilish / rekord */}
+        <View style={styles.tileRow}>
+          <GlassSurface style={styles.tile} fallbackStyle={styles.tileFallback}>
+            <ProgressRing
+              size={44}
+              progress={(occupancy ?? 0) / 100}
+              color={colors.primary}
+              track={alpha(colors.outlineVariant, 0.6)}
+            >
+              <Text style={styles.ringText}>{occupancy !== null ? `${occupancy}%` : "—"}</Text>
+            </ProgressRing>
+            <Text style={styles.tileLabel} numberOfLines={2}>
+              {t("pv.occupancy_today")}
+            </Text>
+          </GlassSurface>
+
+          <GlassSurface style={styles.tile} fallbackStyle={styles.tileFallback}>
+            <Text
+              style={[
+                styles.tileValue,
+                { color: monthStats.cancelRate > 20 ? colors.error : colors.onSurface },
+              ]}
+            >
+              {monthStats.cancelRate}%
+            </Text>
+            <Text style={styles.tileSub}>{t("pv.n_bookings", { n: monthStats.cancelledCount })}</Text>
+            <Text style={styles.tileLabel} numberOfLines={2}>
+              {t("pv.cancel_rate")}
+            </Text>
+          </GlassSurface>
+
+          <GlassSurface style={styles.tile} fallbackStyle={styles.tileFallback}>
+            <View style={styles.tileIconRow}>
+              <Trophy size={14} color={colors.secondary} />
+              <Text style={styles.tileValueSm} numberOfLines={1} adjustsFontSizeToFit>
+                {monthStats.recordSum > 0 ? formatSom(monthStats.recordSum) : "—"}
+              </Text>
+            </View>
+            {monthStats.recordDate ? (
+              <Text style={styles.tileSub}>{formatUzDate(monthStats.recordDate)}</Text>
+            ) : null}
+            <Text style={styles.tileLabel} numberOfLines={2}>
+              {t("pv.record_day")}
+            </Text>
+          </GlassSurface>
+        </View>
+
+        {/* 7 kunlik daromad — ustunni bosib kunni tanlash mumkin */}
+        <GlassSurface style={styles.chartCard} fallbackStyle={styles.tileFallback}>
+          <Pressable style={styles.chartTopRow} onPress={() => setCalOpen(true)}>
+            <Text style={styles.chartTitle}>{t("pv.week_revenue")}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+              <Text style={styles.chartTotal}>
+                {selDay
+                  ? formatUzDate(selDay.date)
+                  : `${formatUzDate(monthStats.week[0].date)} – ${formatUzDate(monthStats.week[6].date)}`}
+              </Text>
+              <ChevronRight size={14} color={colors.primary} />
+            </View>
+          </Pressable>
+
+          {/* Xulosa: tanlangan kun yoki butun hafta — daromad va bronlar soni */}
+          <View style={styles.dayDetail}>
+            <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+              <Text style={styles.dayDetailSum} numberOfLines={1} adjustsFontSizeToFit>
+                {selDay
+                  ? selDay.value > 0
+                    ? formatSom(selDay.value)
+                    : "0"
+                  : monthStats.weekTotal > 0
+                    ? formatSom(monthStats.weekTotal)
+                    : "0"}
+              </Text>
+              <Text style={styles.dayDetailSuffix}>{t("pv.som")}</Text>
+            </View>
+            <Text style={styles.dayDetailSub}>
+              {t("pv.n_bookings", { n: selDay ? selDay.count : monthStats.weekCount })}
+            </Text>
+          </View>
+
+          <MiniBars
+            data={monthStats.week}
+            color={colors.primary}
+            track={alpha(colors.outlineVariant, 0.6)}
+            selected={selectedDayIdx}
+            onSelect={(i) => setSelectedDayIdx((cur) => (cur === i ? null : i))}
+          />
+
+          {/* Tanlangan kunning bronlari */}
+          {selDay && selBookings.length > 0 ? (
+            <View style={styles.dayList}>
+              {selBookings.map((a) => {
+                const cancelled = a.status === "cancelled";
+                return (
+                  <View key={a.id} style={styles.dayRow}>
+                    <Text style={styles.dayRowTime}>{hhmm(a.start_time)}</Text>
+                    <Text
+                      style={[
+                        styles.dayRowName,
+                        cancelled && {
+                          textDecorationLine: "line-through",
+                          color: colors.onSurfaceVariant,
+                        },
+                      ]}
+                      numberOfLines={1}
+                    >
                       {a.client?.full_name || "—"}
                     </Text>
-                    <Text style={styles.apptService} numberOfLines={1}>
-                      {serviceLine(a)}
+                    <Text style={[styles.dayRowPrice, cancelled && { color: colors.error }]}>
+                      {cancelled
+                        ? t("pv.status_cancelled")
+                        : a.price
+                          ? formatSom(a.price)
+                          : "—"}
                     </Text>
                   </View>
-                  <StatusBadge label={statusLabel(a.status)} tone={statusTone(a.status)} />
-                </View>
-                {a.status === "upcoming" ? renderActions(a) : null}
-              </View>
+                );
+              })}
             </View>
-          ))
-        )}
+          ) : null}
+        </GlassSurface>
+
+        {/* Top mijozlar */}
+        {monthStats.topClients.length > 0 ? (
+          <GlassSurface style={styles.chartCard} fallbackStyle={styles.tileFallback}>
+            <Text style={styles.chartTitle}>{t("pv.top_clients")}</Text>
+            {monthStats.topClients.map((c, i) => (
+              <View key={i} style={[styles.topRow, i > 0 && styles.topRowBorder]}>
+                <Text style={styles.topRank}>{i + 1}</Text>
+                <ClientAvatar name={c.client?.full_name || null} avatarUrl={c.client?.avatar_url} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.apptName} numberOfLines={1}>
+                    {c.client?.full_name || "—"}
+                  </Text>
+                  <Text style={styles.apptService}>{t("pv.n_bookings", { n: c.count })}</Text>
+                </View>
+                {c.spend > 0 ? (
+                  <Text style={styles.topSpend}>{formatSom(c.spend)}</Text>
+                ) : null}
+              </View>
+            ))}
+          </GlassSurface>
+        ) : null}
       </View>
+      )}
+
+      {/* Oylik kalendar — kunlar heatmap, kun tanlansa tafsilotlar */}
+      <MonthOverviewModal
+        visible={calOpen}
+        onClose={() => setCalOpen(false)}
+        appointments={appointments}
+        today={today}
+      />
     </Screen>
   );
 }
@@ -361,40 +666,8 @@ const useStyles = makeThemedStyles((colors) =>
     },
     chipLabel: { fontSize: 11, color: colors.onSurfaceVariant, marginTop: 1 },
 
-    nextCard: {
-      backgroundColor: alpha(colors.primaryContainer, 0.08),
-      borderWidth: 1,
-      borderColor: alpha(colors.primaryContainer, 0.3),
-      borderRadius: radius.xl,
-      padding: 16,
-      gap: 12,
-    },
-    nextLabel: {
-      fontSize: 11,
-      fontWeight: "700",
-      color: colors.primary,
-      textTransform: "uppercase",
-      letterSpacing: 0.8,
-    },
-    nextRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-    nextTime: {
-      fontSize: 22,
-      fontWeight: "800",
-      color: colors.primary,
-      letterSpacing: -0.5,
-      fontVariant: ["tabular-nums"],
-    },
-    nextTimeEnd: {
-      fontSize: 12,
-      color: colors.onSurfaceVariant,
-      fontVariant: ["tabular-nums"],
-      marginTop: 1,
-    },
-    nextDivider: { width: 1, alignSelf: "stretch", backgroundColor: alpha(colors.primaryContainer, 0.3) },
-
     apptName: { fontWeight: "600", fontSize: 14, color: colors.onSurface },
     apptService: { fontSize: 12, color: colors.onSurfaceVariant, marginTop: 1 },
-    actionsRow: { flexDirection: "row", gap: 8 },
 
     sectionRow: {
       flexDirection: "row",
@@ -405,29 +678,162 @@ const useStyles = makeThemedStyles((colors) =>
     sectionTitle: { fontSize: 16, fontWeight: "700", color: colors.onSurface, letterSpacing: -0.3 },
     viewAll: { color: colors.primary, fontSize: 13, fontWeight: "600" },
 
-    tlRow: { flexDirection: "row", gap: 10 },
-    tlTime: {
-      width: 42,
-      fontSize: 13,
-      fontWeight: "700",
-      color: colors.onSurface,
-      paddingTop: 12,
-      fontVariant: ["tabular-nums"],
-    },
-    tlRail: { width: 12, alignItems: "center", paddingTop: 17 },
-    tlDot: { width: 8, height: 8, borderRadius: 4 },
-    tlLine: { flex: 1, width: 2, borderRadius: 1, backgroundColor: colors.outlineVariant, marginTop: 4 },
-    tlCard: {
-      flex: 1,
-      minWidth: 0,
+    // ── Statistika bo'limi ──
+    monthCard: { borderRadius: radius.xxxl, padding: 16, overflow: "hidden" },
+    monthCardFallback: {
       backgroundColor: colors.surfaceContainer,
       borderWidth: 1,
       borderColor: colors.outlineVariant,
-      borderRadius: radius.lg,
-      padding: 12,
-      gap: 10,
-      marginBottom: 10,
     },
-    tlCardTop: { flexDirection: "row", alignItems: "center", gap: 10 },
+    monthTopRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    monthLabel: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: colors.onSurfaceVariant,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+    },
+    changeBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    changeBadgeText: { fontSize: 12, fontWeight: "700", fontVariant: ["tabular-nums"] },
+    monthValueRow: { flexDirection: "row", alignItems: "baseline", gap: 6, marginTop: 8 },
+    monthValue: {
+      fontSize: 28,
+      fontWeight: "800",
+      color: colors.onSurface,
+      letterSpacing: -0.8,
+      fontVariant: ["tabular-nums"],
+      flexShrink: 1,
+    },
+    monthSuffix: { fontSize: 13, fontWeight: "700", color: colors.onSurfaceVariant },
+    monthVsPrev: { fontSize: 11, color: colors.onSurfaceVariant, marginTop: 2 },
+    monthMetaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 14,
+      marginTop: 14,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.outlineVariant,
+    },
+    monthMeta: { flexDirection: "row", alignItems: "center", gap: 6 },
+    monthMetaValue: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: colors.onSurface,
+      fontVariant: ["tabular-nums"],
+    },
+    monthMetaLabel: { fontSize: 12, color: colors.onSurfaceVariant },
+    monthMetaDivider: { width: 1, height: 16, backgroundColor: colors.outlineVariant },
+
+    tileRow: { flexDirection: "row", gap: 12 },
+    tile: {
+      flex: 1,
+      borderRadius: radius.xl,
+      padding: 12,
+      alignItems: "center",
+      gap: 6,
+      overflow: "hidden",
+    },
+    tileFallback: {
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    ringText: { fontSize: 11, fontWeight: "800", color: colors.onSurface, fontVariant: ["tabular-nums"] },
+    tileValue: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: colors.onSurface,
+      letterSpacing: -0.3,
+      fontVariant: ["tabular-nums"],
+    },
+    tileValueSm: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: colors.onSurface,
+      fontVariant: ["tabular-nums"],
+      flexShrink: 1,
+    },
+    tileIconRow: { flexDirection: "row", alignItems: "center", gap: 5, minHeight: 44 },
+    tileSub: { fontSize: 10, color: colors.onSurfaceVariant, fontWeight: "600" },
+    tileLabel: {
+      fontSize: 11,
+      color: colors.onSurfaceVariant,
+      textAlign: "center",
+      fontWeight: "500",
+    },
+
+    chartCard: { borderRadius: radius.xl, padding: 16, overflow: "hidden" },
+    chartTopRow: {
+      flexDirection: "row",
+      alignItems: "baseline",
+      justifyContent: "space-between",
+      gap: 8,
+      marginBottom: 12,
+    },
+    chartTitle: { fontSize: 14, fontWeight: "700", color: colors.onSurface, letterSpacing: -0.2 },
+    chartTotal: { fontSize: 12, fontWeight: "700", color: colors.primary, fontVariant: ["tabular-nums"] },
+    dayDetail: { marginBottom: 12 },
+    dayDetailSum: {
+      fontSize: 24,
+      fontWeight: "800",
+      color: colors.onSurface,
+      letterSpacing: -0.6,
+      fontVariant: ["tabular-nums"],
+      flexShrink: 1,
+    },
+    dayDetailSuffix: { fontSize: 12, fontWeight: "700", color: colors.onSurfaceVariant },
+    dayDetailSub: { fontSize: 12, color: colors.onSurfaceVariant, fontWeight: "600", marginTop: 2 },
+
+    dayList: { marginTop: 12, borderTopWidth: 1, borderTopColor: colors.outlineVariant },
+    dayRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      paddingVertical: 8,
+    },
+    dayRowTime: {
+      width: 44,
+      fontSize: 12,
+      fontWeight: "700",
+      color: colors.onSurfaceVariant,
+      fontVariant: ["tabular-nums"],
+    },
+    dayRowName: { flex: 1, fontSize: 13, fontWeight: "600", color: colors.onSurface },
+    dayRowPrice: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: colors.primary,
+      fontVariant: ["tabular-nums"],
+    },
+
+    miniChart: { flexDirection: "row", alignItems: "flex-end", height: 72, gap: 6 },
+    miniCol: { flex: 1, alignItems: "center", gap: 4, height: "100%" },
+    miniBarWrap: { flex: 1, width: "100%", justifyContent: "flex-end" },
+    miniLabel: { fontSize: 9, fontWeight: "600", color: colors.onSurfaceVariant },
+
+    topRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 8 },
+    topRowBorder: { borderTopWidth: 1, borderTopColor: colors.outlineVariant },
+    topRank: {
+      width: 20,
+      fontSize: 13,
+      fontWeight: "800",
+      color: colors.onSurfaceVariant,
+      textAlign: "center",
+      fontVariant: ["tabular-nums"],
+    },
+    topSpend: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: colors.primary,
+      fontVariant: ["tabular-nums"],
+    },
   })
 );
