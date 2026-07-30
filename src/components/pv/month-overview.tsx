@@ -124,7 +124,7 @@ export function MonthOverviewModal({
           </Pressable>
         </View>
 
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
           {/* Oy xulosasi */}
           <View style={styles.totalsRow}>
             <View style={{ flex: 1 }}>

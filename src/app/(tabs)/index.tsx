@@ -306,10 +306,6 @@ function OverviewContent() {
     [appointments, selDay]
   );
 
-  const hour = Number(now.hhmm.slice(0, 2));
-  const greeting =
-    hour < 12 ? t("pv.greet_morning") : hour < 18 ? t("pv.greet_day") : t("pv.greet_evening");
-
   return (
     <Screen
       refreshing={loading}
@@ -318,10 +314,9 @@ function OverviewContent() {
         reloadWaitlist();
       }}
     >
-      {/* Salomlashuv + tezkor tugmalar */}
+      {/* Sarlavha + tezkor tugmalar */}
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.greeting}>{greeting}</Text>
           <Text style={styles.title}>{t("pv.nav_dashboard")}</Text>
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
@@ -375,8 +370,8 @@ function OverviewContent() {
         </View>
       </View>
 
-      {/* ── Statistika ── */}
-      {loading ? (
+      {/* ── Statistika ── Spinner faqat birinchi yuklanishda; refresh'da tepadagi logo yetadi */}
+      {loading && appointments.length === 0 ? (
         <Spinner />
       ) : (
       <View style={{ gap: 12 }}>
@@ -609,7 +604,6 @@ export default function OverviewScreen() {
 const useStyles = makeThemedStyles((colors) =>
   StyleSheet.create({
     headerRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
-    greeting: { fontSize: 13, fontWeight: "500", color: colors.onSurfaceVariant, marginBottom: 2 },
     title: { fontSize: 24, fontWeight: "700", color: colors.onSurface, letterSpacing: -0.5 },
 
     hero: { backgroundColor: colors.primary, borderRadius: radius.xxxl, padding: 20 },

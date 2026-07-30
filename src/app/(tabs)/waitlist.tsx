@@ -71,7 +71,7 @@ function WaitlistContent() {
 
   return (
     <Screen refreshing={loading} onRefresh={reload}>
-      <PageHeader title={t("pv.wl_title")} subtitle={t("pv.wl_sub")} />
+      <PageHeader title={t("pv.wl_title")} />
 
       {/* Statistika */}
       <View style={styles.statsRow}>
@@ -100,7 +100,7 @@ function WaitlistContent() {
 
       {/* Ro'yxat */}
       <Card>
-        {loading ? (
+        {loading && sorted.length === 0 ? (
           <Spinner />
         ) : sorted.length === 0 ? (
           <EmptyState icon={Hourglass} title={t("pv.wl_empty")} desc={t("pv.wl_empty_desc")} />

@@ -15,7 +15,7 @@ export default function TabsLayout() {
   const chatUnread = useChatUnread();
 
   return (
-    <NativeTabs tintColor={colors.primary} minimizeBehavior="onScrollDown">
+    <NativeTabs tintColor={colors.primary}>
       <NativeTabs.Trigger name="index">
         <Icon
           sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }}

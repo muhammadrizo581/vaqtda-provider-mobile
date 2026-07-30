@@ -1,6 +1,6 @@
 // Bronlar — saytdagi app/dashboard/appointments/page.tsx dan port.
 import { CalendarDays, CheckCircle2, Phone, Search, X } from "lucide-react-native";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   Alert,
   Linking,
@@ -113,22 +113,29 @@ function AppointmentsContent() {
   const [dayFilter, setDayFilter] = useState<string>(today);
   const [query, setQuery] = useState("");
   const [actingId, setActingId] = useState<string | null>(null);
+  const dayScrollRef = useRef<ScrollView>(null);
+  const todayTabX = useRef(0);
 
-  // Tepadagi kun tablari: Bugun, Ertaga + keyingi bronli kunlar
+  // Tepadagi kun tablari: o'tgan bronli kunlar ← Bugun → kelgusi 7 kun (bo'sh bo'lsa ham)
   const dayTabs = useMemo(() => {
     const countOn = (d: string) => appointments.filter((a) => spansDay(a, d)).length;
-    const extraDates = [...new Set(appointments.map((a) => a.booking_date))]
-      .filter((d) => d > tomorrow)
-      .sort();
+    const dates = [...new Set(appointments.map((a) => a.booking_date))];
+    const pastDates = dates.filter((d) => d < today).sort();
+    const next7 = Array.from({ length: 7 }, (_, i) => addDaysStr(today, i + 1));
+    const extraFuture = dates.filter((d) => d > next7[6]).sort();
+    const wd = (d: string) => UZ_WEEKDAYS[weekdayKeyOf(d)];
+    const tab = (d: string, label?: string) => ({
+      key: d,
+      label: label ?? wd(d),
+      sub: formatUzDate(d),
+      count: countOn(d),
+    });
     return [
-      { key: today, label: t("date.today"), sub: formatUzDate(today), count: countOn(today) },
-      { key: tomorrow, label: t("date.tomorrow"), sub: formatUzDate(tomorrow), count: countOn(tomorrow) },
-      ...extraDates.map((d) => ({
-        key: d,
-        label: UZ_WEEKDAYS[weekdayKeyOf(d)],
-        sub: formatUzDate(d),
-        count: countOn(d),
-      })),
+      ...pastDates.map((d) => tab(d)),
+      tab(today, t("date.today")),
+      tab(tomorrow, t("date.tomorrow")),
+      ...next7.slice(1).map((d) => tab(d)),
+      ...extraFuture.map((d) => tab(d)),
     ];
   }, [appointments, today, tomorrow, t]);
 
@@ -202,24 +209,44 @@ function AppointmentsContent() {
 
   return (
     <Screen refreshing={loading} onRefresh={reload}>
-      <PageHeader title={t("pv.appts_title")} subtitle={t("pv.appts_sub")} />
+      <PageHeader title={t("pv.appts_title")} />
 
-      {/* Kun tablari: Barchasi / Bugun / Ertaga / keyingi bronli kunlar */}
+      {/* Kun tablari: o'tganlar ← Bugun → kelgusi kunlar; ochilganda Bugun ko'rinib turadi */}
       <ScrollView
+        ref={dayScrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         style={{ flexGrow: 0 }}
         contentContainerStyle={{ gap: 8 }}
       >
         {dayTabs.map((d) => (
-          <DayTab
+          <View
             key={d.key}
-            label={d.label}
-            sub={d.sub}
-            count={d.count}
-            active={dayFilter === d.key}
-            onPress={() => setDayFilter(d.key)}
-          />
+            onLayout={
+              d.key === today
+                ? (e) => {
+                    const x = e.nativeEvent.layout.x;
+                    // O'tgan kunlar yuklanib, Bugun siljiganda scroll'ni unga keltiramiz
+                    if (Math.abs(x - todayTabX.current) > 1) {
+                      todayTabX.current = x;
+                      dayScrollRef.current?.scrollTo({ x: Math.max(0, x - 12), animated: false });
+                    }
+                  }
+                : undefined
+            }
+          >
+            <DayTab
+              label={d.label}
+              sub={d.sub}
+              count={d.count}
+              active={dayFilter === d.key}
+              onPress={() => {
+                setDayFilter(d.key);
+                // O'tgan kunda "Kutilmoqda" bo'lmaydi — avtomatik "Barchasi"ga o'tamiz
+                if (d.key < today && statusFilter === "upcoming") setStatusFilter("all");
+              }}
+            />
+          </View>
         ))}
       </ScrollView>
 
@@ -261,8 +288,8 @@ function AppointmentsContent() {
         </View>
       </View>
 
-      {/* Ro'yxat */}
-      {loading ? (
+      {/* Ro'yxat — Spinner faqat birinchi yuklanishda; refresh'da tepadagi logo yetadi */}
+      {loading && appointments.length === 0 ? (
         <Spinner />
       ) : groups.length === 0 ? (
         <Card>
@@ -442,11 +469,12 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     justifyContent: "center",
     zIndex: 10,
     // Qalqib turgan pill — ostidagi pill'lardan ajralib ko'rinsin
+    // (light mode'da og'ir qora soya xunuk ko'rinadi — yumshoq qilingan)
     shadowColor: "#000",
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
     shadowOffset: { width: -2, height: 2 },
-    elevation: 8,
+    elevation: 4,
   },
 
   dayTab: {

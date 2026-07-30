@@ -188,7 +188,7 @@ export default function LoginScreen() {
       style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView
+      <ScrollView showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.container,
           { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 24 },

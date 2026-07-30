@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { Animated, Easing, RefreshControl, StyleSheet, View } from "react-native";
+import { Animated, Easing, Platform, RefreshControl, StyleSheet, View } from "react-native";
 import Svg, { Defs, G, Path, Rect, RadialGradient, Stop } from "react-native-svg";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -80,17 +80,27 @@ export function VaqtdaRefreshControl(props: React.ComponentProps<typeof RefreshC
       tintColor="transparent"
       colors={["transparent"]}
       progressBackgroundColor="transparent"
-      style={{ backgroundColor: "transparent" }}
+      // iOS'da tintColor="transparent"ning o'zi yetmaydi — default spinner ba'zida
+      // baribir ko'rinib qoladi; opacity: 0 uni butunlay yashiradi (pull mexanikasi
+      // saqlanadi). Android'da opacity qo'yilmaydi: u yerda RefreshControl butun
+      // skroll konteynerini o'raydi va kontentni ham yashirib yuborardi.
+      style={[{ backgroundColor: "transparent" }, Platform.OS === "ios" && { opacity: 0 }]}
     />
   );
 }
 
 /**
- * Refresh paytida kontent tepasida chiqadigan brend indikator.
- * Fon shaffof native spinner o'rniga — Vaqtda barglari, yumshoq kirish
- * animatsiyasi (fade + scale) bilan.
+ * Refresh indikatori — Vaqtda barglari.
+ *
+ * iOS: Apple uslubi — barglar kontentdan TEPADA, tortilganda ochiladigan
+ * bo'shliqning ichida turadi. Pull qilganda kontent bilan birga pastga tushib
+ * ko'rinadi, refresh davomida ochiq qolgan bo'shliqda aylanadi (buni native
+ * RefreshControl inset'i ushlab turadi), tugagach kontent bilan yopilib ketadi.
+ *
+ * Android: bounce/overscroll yo'q — avvalgidek kontent tepasida yumshoq
+ * kirish animatsiyasi (fade + scale) bilan chiqadi.
  */
-export function VaqtdaRefreshing({ refreshing }: { refreshing: boolean }) {
+export function VaqtdaRefreshing({ refreshing, color }: { refreshing: boolean; color?: string }) {
   const anim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -101,6 +111,19 @@ export function VaqtdaRefreshing({ refreshing }: { refreshing: boolean }) {
       useNativeDriver: true,
     }).start();
   }, [refreshing, anim]);
+
+  if (Platform.OS === "ios") {
+    // Doim mount — pull boshlanishi bilanoq bo'shliqda ko'rinadi (Apple'dagidek).
+    // position: absolute — layoutga (gap/padding) ta'sir qilmaydi.
+    return (
+      <View
+        pointerEvents="none"
+        style={{ position: "absolute", top: -45, left: 0, right: 0, alignItems: "center" }}
+      >
+        <VaqtdaLoading size={30} color={color} />
+      </View>
+    );
+  }
 
   // Ko'rinmayotgan bo'lsa (animatsiya ham tugagan) — DOM'dan olib tashlaymiz.
   if (!refreshing) return null;
@@ -117,7 +140,7 @@ export function VaqtdaRefreshing({ refreshing }: { refreshing: boolean }) {
         ],
       }}
     >
-      <VaqtdaLoading size={34} />
+      <VaqtdaLoading size={34} color={color} />
     </Animated.View>
   );
 }

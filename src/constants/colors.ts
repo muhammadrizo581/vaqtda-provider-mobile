@@ -1,34 +1,33 @@
-// "Yashil Grafit" dizayn tokenlari — yer yengil yashil-grafit, yashil aksent.
-// Mijoz ilovasi (vaqtda-mobile) palitrasiga moslangan: primary yashil.
+// "Indigo" dizayn tokenlari — neytral ko'k-qora yer, indigo aksent.
 // Komponentlarda hex yozish taqiqlangan: faqat shu tokenlar ishlatiladi.
 // Faol palitra ThemeContext'dagi useColors() orqali olinadi — bu fayldan
 // to'g'ridan-to'g'ri palitra import qilinmaydi (dark/light almashinuvi uchun).
 
 // Dark palitra — asosiy (default) tema.
 export const darkColors = {
-  background: "#0f1311",
-  surface: "#0f1311",
-  onSurface: "#ecefea",
-  onSurfaceVariant: "#98a29a",
+  background: "#0b0d12",
+  surface: "#0b0d12",
+  onSurface: "#e9ebf1",
+  onSurfaceVariant: "#9aa1b0",
 
-  surfaceContainerLowest: "#0a0d0b",
-  surfaceContainerLow: "#141a16",
-  surfaceContainer: "#181e1a",
-  surfaceContainerHigh: "#1f2721",
-  surfaceContainerHighest: "#27302a",
-  surfaceVariant: "#27302a",
+  surfaceContainerLowest: "#07090d",
+  surfaceContainerLow: "#10131a",
+  surfaceContainer: "#141822",
+  surfaceContainerHigh: "#1a1f2b",
+  surfaceContainerHighest: "#222836",
+  surfaceVariant: "#222836",
 
-  outline: "#8a968c",
-  outlineVariant: "#2a332c",
+  outline: "#8b93a5",
+  outlineVariant: "#262c3a",
 
-  primary: "#7bae85", // yashil aksent (mijoz ilovasi dark primary) — och yashil, qorong'i fonda tiniq
-  onPrimary: "#0f1311", // och yashil to'ldirish ustida qorong'i siyoh
-  primaryContainer: "#7bae85",
-  onPrimaryContainer: "#0f1311",
+  primary: "#818cf8", // indigo aksent — qorong'i fonda tiniq
+  onPrimary: "#0b0d12", // och indigo to'ldirish ustida qorong'i siyoh
+  primaryContainer: "#818cf8",
+  onPrimaryContainer: "#0b0d12",
 
-  secondary: "#e8c06a", // oltin (kutilmoqda statuslari)
-  onSecondary: "#3d2e00",
-  secondaryContainer: "#d4a034",
+  secondary: "#e6c266", // oltin (kutilmoqda statuslari)
+  onSecondary: "#3a2e00",
+  secondaryContainer: "#d4a942",
 
   tertiary: "#f0876a", // marjon (tasdiq kutilmoqda)
   onTertiary: "#4a1500",
@@ -40,31 +39,31 @@ export const darkColors = {
   onErrorContainer: "#ffdad6",
 } as const;
 
-// Light palitra — dark bilan bir xil kalitlar, qiymatlar light rejim uchun.
+// Light palitra — toza oq-neytral yer, to'q indigo aksent.
 export const lightColors: Colors = {
-  background: "#f6f7f5",
+  background: "#eef0f5",
   surface: "#ffffff",
-  onSurface: "#181d19",
-  onSurfaceVariant: "#6b7280",
+  onSurface: "#171a21",
+  onSurfaceVariant: "#5d6472",
 
   surfaceContainerLowest: "#ffffff",
-  surfaceContainerLow: "#eff1ee",
+  surfaceContainerLow: "#f3f4f8",
   surfaceContainer: "#ffffff",
-  surfaceContainerHigh: "#e8ebe7",
-  surfaceContainerHighest: "#dee3dd",
-  surfaceVariant: "#dee3dd",
+  surfaceContainerHigh: "#e7eaf1",
+  surfaceContainerHighest: "#dde1ea",
+  surfaceVariant: "#e4e7ef",
 
-  outline: "#7b857d",
-  outlineVariant: "#e5e7eb",
+  outline: "#737b8c",
+  outlineVariant: "#dde1ea",
 
-  primary: "#4c8156", // to'q yashil (mijoz ilovasi light primary)
+  primary: "#4f46e5", // to'q indigo — oq fonda kuchli kontrast
   onPrimary: "#ffffff",
-  primaryContainer: "#4c8156",
+  primaryContainer: "#4f46e5",
   onPrimaryContainer: "#ffffff",
 
-  secondary: "#8a6510",
+  secondary: "#8a6a15",
   onSecondary: "#ffffff",
-  secondaryContainer: "#c4962c",
+  secondaryContainer: "#c9992e",
 
   tertiary: "#b34f22",
   onTertiary: "#ffffff",

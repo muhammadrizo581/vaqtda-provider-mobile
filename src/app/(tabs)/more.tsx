@@ -133,7 +133,7 @@ export default function MoreScreen() {
 
   return (
     <Screen>
-      <PageHeader title={t("pv.nav_more")} subtitle={t("pv.more_sub")} />
+      <PageHeader title={t("pv.nav_more")} />
 
       {/* Profil: kirgan bo'lsa — hisob kartasi, bo'lmasa — Kirish */}
       {isAuthenticated ? (

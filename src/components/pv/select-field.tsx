@@ -45,7 +45,7 @@ export function SelectField({
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>{label}</Text>
-            <FlatList
+            <FlatList showsVerticalScrollIndicator={false}
               data={options}
               keyExtractor={(o) => o.value}
               style={{ maxHeight: 380 }}

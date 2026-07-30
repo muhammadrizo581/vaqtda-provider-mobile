@@ -320,7 +320,7 @@ export default function BusinessProfileScreen() {
       style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <ScrollView
+      <ScrollView showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingTop: insets.top + 12,
           paddingBottom: insets.bottom + 32,

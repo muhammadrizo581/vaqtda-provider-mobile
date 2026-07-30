@@ -74,9 +74,9 @@ function ChatListContent() {
 
   return (
     <Screen refreshing={loading} onRefresh={load}>
-      <PageHeader title={t("chat.title")} subtitle={t("chat.sub")} />
+      <PageHeader title={t("chat.title")} />
 
-      {loading ? (
+      {loading && conversations.length === 0 ? (
         <Spinner />
       ) : conversations.length === 0 ? (
         <Card>

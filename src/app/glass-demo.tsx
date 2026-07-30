@@ -21,7 +21,7 @@ export default function GlassDemoScreen() {
   return (
     <View style={styles.root}>
       {/* Orqa fon — glass ostida harakatlanadigan rangli kontent */}
-      <ScrollView contentContainerStyle={{ paddingTop: insets.top + 120, paddingBottom: 160 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: insets.top + 120, paddingBottom: 160 }}>
         {BLOCKS.map((b) => (
           <View key={b.label} style={[styles.block, { backgroundColor: b.bg }]}>
             <Text style={styles.blockText}>{b.label}</Text>

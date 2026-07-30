@@ -271,7 +271,7 @@ export default function ChatThreadScreen() {
         {loading ? (
           <Spinner style={{ flex: 1 }} />
         ) : (
-          <ScrollView
+          <ScrollView showsVerticalScrollIndicator={false}
             ref={scrollRef}
             style={{ flex: 1 }}
             contentContainerStyle={[
