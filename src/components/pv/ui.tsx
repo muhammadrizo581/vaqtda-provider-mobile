@@ -275,6 +275,44 @@ export function FilterPill({
   );
 }
 
+// ── Tanlov pili — chip qatorlarda (davomiylik, foiz, PK turi va h.k.) ──
+export function SelectPill({
+  label,
+  active,
+  onPress,
+  style,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const styles = useStyles();
+  const colors = useColors();
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }, style]}>
+      <GlassSurface
+        style={styles.selectPillGlass}
+        fallbackStyle={[
+          styles.selectPillFallback,
+          active
+            ? { backgroundColor: colors.primary, borderColor: colors.primary }
+            : { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant },
+        ]}
+        tintColor={active ? colors.primary : undefined}
+        interactive
+      >
+        <Text
+          style={[styles.selectPillText, { color: active ? colors.onPrimary : colors.onSurfaceVariant }]}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+      </GlassSurface>
+    </Pressable>
+  );
+}
+
 // ── Kichik tugma (asosiy / ikkilamchi) ──
 export function SmallButton({
   label,
@@ -502,6 +540,17 @@ const useStyles = makeThemedStyles((colors) =>
       borderColor: colors.outlineVariant,
     },
     iconBtnInner: { flex: 1, alignItems: "center", justifyContent: "center" },
+
+    selectPillGlass: {
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+      borderRadius: 999,
+      alignItems: "center",
+      justifyContent: "center",
+      overflow: "hidden",
+    },
+    selectPillFallback: { borderWidth: 1 },
+    selectPillText: { fontSize: 13, fontWeight: "600" },
 
     smallBtn: {
       flexDirection: "row",

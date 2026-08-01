@@ -25,7 +25,7 @@ import { BusinessGate } from "@/components/pv/business-gate";
 import { Screen } from "@/components/pv/screen";
 import { TimeField } from "@/components/pv/time-field";
 import { useToast } from "@/components/pv/toast";
-import { Card, GlassIconButton, SmallButton, Spinner, TogglePill } from "@/components/pv/ui";
+import { Card, GlassIconButton, GlassSurface, SelectPill, SmallButton, Spinner, TogglePill } from "@/components/pv/ui";
 import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
@@ -535,24 +535,24 @@ function ScheduleContent() {
 
         {/* Jonli Toshkent vaqti + holat */}
         <View style={styles.liveRow}>
-          <View style={styles.clockChip}>
+          <GlassSurface style={styles.clockChip} fallbackStyle={styles.chipFallback}>
             <View style={styles.liveDot} />
             <Clock size={13} color={colors.primary} />
             <Text style={styles.clockText}>
               {UZ_WEEKDAYS[tashNow.weekdayKey]}, {formatUzDate(tashNow.dateStr)} · {tashNow.hhmm}
             </Text>
             <Text style={styles.clockSub}>{t("tt.tashkent_time")}</Text>
-          </View>
-          <View
-            style={[
-              styles.statusChip,
-              liveStatus.open
-                ? {
-                    backgroundColor: alpha(colors.primaryContainer, 0.2),
-                    borderColor: alpha(colors.primaryContainer, 0.4),
-                  }
-                : { backgroundColor: colors.surfaceContainer, borderColor: colors.outlineVariant },
+          </GlassSurface>
+          <GlassSurface
+            style={styles.statusChip}
+            fallbackStyle={[
+              styles.chipFallback,
+              liveStatus.open && {
+                backgroundColor: alpha(colors.primaryContainer, 0.2),
+                borderColor: alpha(colors.primaryContainer, 0.4),
+              },
             ]}
+            tintColor={liveStatus.open ? alpha(colors.primaryContainer, 0.35) : undefined}
           >
             <View
               style={[
@@ -568,7 +568,7 @@ function ScheduleContent() {
             >
               {liveStatus.label}
             </Text>
-          </View>
+          </GlassSurface>
         </View>
       </View>
 
@@ -582,7 +582,11 @@ function ScheduleContent() {
 
       {/* Error */}
       {error ? (
-        <View style={styles.errorBox}>
+        <GlassSurface
+          style={styles.errorBox}
+          fallbackStyle={styles.errorBoxFallback}
+          tintColor={alpha(colors.errorContainer, 0.35)}
+        >
           <AlertCircle size={16} color={colors.error} />
           <Text style={styles.errorText}>{error}</Text>
           {((tableMode && activeTables === 0) || (mode === "slots" && activeServices === 0)) && (
@@ -592,13 +596,13 @@ function ScheduleContent() {
               </Text>
             </Pressable>
           )}
-        </View>
+        </GlassSurface>
       ) : null}
 
       {/* Stats */}
       <View style={styles.statTiles}>
         {statTiles.map((s) => (
-          <View key={s.label} style={styles.statTile}>
+          <GlassSurface key={s.label} style={styles.statTile} fallbackStyle={styles.statTileFallback}>
             <View style={[styles.statTileIcon, { backgroundColor: s.bg }]}>
               <s.icon size={18} color={s.color} />
             </View>
@@ -608,7 +612,7 @@ function ScheduleContent() {
                 {s.label}
               </Text>
             </View>
-          </View>
+          </GlassSurface>
         ))}
       </View>
 
@@ -876,28 +880,13 @@ function ScheduleContent() {
           </Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {SLOT_DURATION_OPTIONS.map((v) => (
-              <Pressable
+              <SelectPill
                 key={v}
+                label={v % 60 === 0 ? `${v / 60} ${t("unit.hour")}` : `${v} ${t("common.min")}`}
+                active={config.slotMinutes === v}
                 onPress={() => setConfig((c) => ({ ...c, slotMinutes: v }))}
-                style={[
-                  styles.bufferBtn,
-                  config.slotMinutes === v
-                    ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                    : {
-                        backgroundColor: colors.surfaceContainerLowest,
-                        borderColor: colors.outlineVariant,
-                      },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.bufferText,
-                    { color: config.slotMinutes === v ? colors.onPrimary : colors.onSurfaceVariant },
-                  ]}
-                >
-                  {v % 60 === 0 ? `${v / 60} ${t("unit.hour")}` : `${v} ${t("common.min")}`}
-                </Text>
-              </Pressable>
+                style={{ flexGrow: 1 }}
+              />
             ))}
             <TextInput
               value={String(config.slotMinutes)}
@@ -923,31 +912,13 @@ function ScheduleContent() {
         </Text>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
           {BUFFER_OPTIONS.map((v) => (
-            <Pressable
+            <SelectPill
               key={v}
+              label={v === 0 ? t("tt.buffer_none") : `${v} ${t("common.min")}`}
+              active={config.bufferMinutes === v}
               onPress={() => setConfig((c) => ({ ...c, bufferMinutes: v }))}
-              style={[
-                styles.bufferBtn,
-                config.bufferMinutes === v
-                  ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                  : {
-                      backgroundColor: colors.surfaceContainerLowest,
-                      borderColor: colors.outlineVariant,
-                    },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.bufferText,
-                  {
-                    color:
-                      config.bufferMinutes === v ? colors.onPrimary : colors.onSurfaceVariant,
-                  },
-                ]}
-              >
-                {v === 0 ? t("tt.buffer_none") : `${v} ${t("common.min")}`}
-              </Text>
-            </Pressable>
+              style={{ flexGrow: 1 }}
+            />
           ))}
         </View>
       </Card>
@@ -972,12 +943,15 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: colors.surfaceContainer,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
     borderRadius: 999,
     paddingHorizontal: 14,
     paddingVertical: 6,
+    overflow: "hidden",
+  },
+  chipFallback: {
+    backgroundColor: colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary },
   clockText: { fontSize: 11, fontWeight: "700", color: colors.onSurface },
@@ -989,7 +963,7 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderWidth: 1,
+    overflow: "hidden",
   },
   statusText: { fontSize: 11, fontWeight: "700" },
 
@@ -997,12 +971,15 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: alpha(colors.errorContainer, 0.2),
-    borderWidth: 1,
-    borderColor: alpha(colors.errorContainer, 0.4),
     borderRadius: radius.lg,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    overflow: "hidden",
+  },
+  errorBoxFallback: {
+    backgroundColor: alpha(colors.errorContainer, 0.2),
+    borderWidth: 1,
+    borderColor: alpha(colors.errorContainer, 0.4),
   },
   errorText: { flex: 1, color: colors.error, fontSize: 13, fontWeight: "600" },
   errorLink: {
@@ -1017,13 +994,17 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+    borderRadius: radius.xl,
+    padding: 14,
+    flexBasis: "47%",
+    flexGrow: 1,
+    overflow: "hidden",
+  },
+  statTileFallback: {
     backgroundColor: colors.surfaceContainer,
     borderWidth: 1,
     borderColor: colors.outlineVariant,
     borderRadius: radius.lg,
-    padding: 14,
-    flexBasis: "47%",
-    flexGrow: 1,
   },
   statTileIcon: {
     width: 40,
@@ -1232,14 +1213,6 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     paddingVertical: 8,
   },
 
-  bufferBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    flexGrow: 1,
-    alignItems: "center",
-  },
   slotDurInput: {
     width: 80,
     backgroundColor: colors.surfaceContainerLowest,
@@ -1252,5 +1225,4 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     fontWeight: "700",
     color: colors.onSurface,
   },
-  bufferText: { fontSize: 12, fontWeight: "700" },
 }));

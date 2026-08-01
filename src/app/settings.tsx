@@ -1,8 +1,10 @@
 // Sozlamalar — web'dagi sidebar funksiyalari: til, biznes profil, chiqish.
 import { useRouter } from "expo-router";
-import { ArrowLeft, ChevronRight, Globe, LogOut, Moon, MonitorSmartphone, Store, Sun } from "lucide-react-native";
+import { ArrowLeft, ChevronRight, Globe, LogOut, Moon, MonitorSmartphone, QrCode, Share2, Store, Sun } from "lucide-react-native";
+import Constants from "expo-constants";
 import React from "react";
-import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import QRCode from "react-native-qrcode-svg";
 import { Screen } from "@/components/pv/screen";
 import { Card, ClientAvatar, GlassIconButton, GlassSurface } from "@/components/pv/ui";
 import { alpha, radius } from "@/constants/colors";
@@ -28,6 +30,26 @@ export default function SettingsScreen() {
   ];
 
   const businessName = localize(provider?.business_name, lang) || provider?.slug || "";
+
+  // QR ichidagi link — mijoz ilovasi (Vaqtda) shu scheme'ni ochadi.
+  // Expo Go'da vaqtda:// scheme ishlamaydi, shuning uchun dev'da exp:// link
+  // beramiz: kamera skaner qilsa Expo Go ochilib mijoz ilovasiga kirib ketadi.
+  // Mijoz ilovasining Metro serveri shu kompyuterda 8081-portda turishi kerak.
+  const devHost = Constants.expoConfig?.hostUri?.split(":")[0];
+  const qrUrl = provider?.slug
+    ? __DEV__ && devHost
+      ? `exp://${devHost}:8081/--/provider/${provider.slug}`
+      : `vaqtda://provider/${provider.slug}`
+    : null;
+
+  const handleShareQr = async () => {
+    if (!qrUrl) return;
+    try {
+      await Share.share({ message: qrUrl });
+    } catch {
+      // foydalanuvchi bekor qildi
+    }
+  };
 
   const handleLogout = () => {
     Alert.alert(t("auth.logout"), "", [
@@ -62,6 +84,34 @@ export default function SettingsScreen() {
           ) : null}
         </View>
       </Card>
+
+      {/* QR kod — mijoz skaner qilib Vaqtda ilovasida bron qiladi */}
+      {qrUrl ? (
+        <Card style={{ padding: 20 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <QrCode size={16} color={colors.primary} />
+            <Text style={styles.sectionTitle}>{t("pv.qr_title")}</Text>
+          </View>
+          <View style={{ alignItems: "center", gap: 14 }}>
+            {/* Oq plastina — tungi temada ham skaner o'qiy olishi uchun */}
+            <View style={styles.qrPlate}>
+              <QRCode value={qrUrl} size={180} backgroundColor="#ffffff" color="#0c1310" />
+            </View>
+            <Text style={styles.qrSub}>{t("pv.qr_sub")}</Text>
+            <Pressable onPress={handleShareQr} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
+              <GlassSurface
+                style={styles.qrShareBtn}
+                fallbackStyle={{ backgroundColor: colors.primary }}
+                tintColor={colors.primary}
+                interactive
+              >
+                <Share2 size={14} color={colors.onPrimary} />
+                <Text style={[styles.langText, { color: colors.onPrimary }]}>{t("pv.qr_share")}</Text>
+              </GlassSurface>
+            </Pressable>
+          </View>
+        </Card>
+      ) : null}
 
       {/* Til */}
       <Card style={{ padding: 20 }}>
@@ -189,4 +239,25 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     justifyContent: "center",
   },
   menuText: { flex: 1, fontSize: 14, fontWeight: "600", color: colors.onSurface },
+
+  qrPlate: {
+    padding: 14,
+    borderRadius: radius.lg,
+    backgroundColor: "#ffffff",
+  },
+  qrSub: {
+    fontSize: 12,
+    color: colors.onSurfaceVariant,
+    textAlign: "center",
+    lineHeight: 17,
+  },
+  qrShareBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    borderRadius: 999,
+    overflow: "hidden",
+  },
 }));

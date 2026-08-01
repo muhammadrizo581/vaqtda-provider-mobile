@@ -327,7 +327,14 @@ function MenuContent() {
               <View style={styles.imageWrap}>
                 <Image source={{ uri: formImageUri }} style={styles.image} contentFit="cover" />
                 <Pressable style={styles.imageRemove} onPress={removeImage}>
-                  <X size={13} color={colors.onErrorContainer} />
+                  <GlassSurface
+                    style={styles.imageRemoveGlass}
+                    fallbackStyle={{ backgroundColor: colors.errorContainer }}
+                    tintColor={alpha(colors.errorContainer, 0.6)}
+                    interactive
+                  >
+                    <X size={13} color={colors.onErrorContainer} />
+                  </GlassSurface>
                 </Pressable>
               </View>
             ) : (
@@ -413,20 +420,36 @@ function MenuContent() {
                 onPress={() => openEdit(m)}
                 style={{ flex: 1 }}
               />
-              <Pressable style={styles.iconAction} onPress={() => toggleActive(m)}>
-                {m.is_active ? (
-                  <EyeOff size={14} color={colors.onSurfaceVariant} />
-                ) : (
-                  <Eye size={14} color={colors.onSurfaceVariant} />
-                )}
+              <Pressable onPress={() => toggleActive(m)}>
+                <GlassSurface style={styles.iconAction} fallbackStyle={styles.iconActionFallback} interactive>
+                  {m.is_active ? (
+                    <EyeOff size={14} color={colors.onSurfaceVariant} />
+                  ) : (
+                    <Eye size={14} color={colors.onSurfaceVariant} />
+                  )}
+                </GlassSurface>
               </Pressable>
               {deleteId === m.id ? (
-                <Pressable style={styles.deleteConfirm} onPress={() => remove(m.id)}>
-                  <Text style={styles.deleteConfirmText}>{t("mnu.delete_q")}</Text>
+                <Pressable onPress={() => remove(m.id)}>
+                  <GlassSurface
+                    style={styles.deleteConfirm}
+                    fallbackStyle={{ backgroundColor: colors.errorContainer }}
+                    tintColor={alpha(colors.errorContainer, 0.6)}
+                    interactive
+                  >
+                    <Text style={styles.deleteConfirmText}>{t("mnu.delete_q")}</Text>
+                  </GlassSurface>
                 </Pressable>
               ) : (
-                <Pressable style={styles.deleteBtn} onPress={() => setDeleteId(m.id)}>
-                  <Trash2 size={14} color={colors.error} />
+                <Pressable onPress={() => setDeleteId(m.id)}>
+                  <GlassSurface
+                    style={styles.deleteBtn}
+                    fallbackStyle={styles.deleteBtnFallback}
+                    tintColor={alpha(colors.errorContainer, 0.3)}
+                    interactive
+                  >
+                    <Trash2 size={14} color={colors.error} />
+                  </GlassSurface>
                 </Pressable>
               )}
             </View>
@@ -497,9 +520,14 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: colors.errorContainer,
+    overflow: "hidden",
+  },
+  imageRemoveGlass: {
+    flex: 1,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   imagePick: {
     width: 104,
@@ -553,24 +581,33 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     borderTopColor: colors.outlineVariant,
   },
   iconAction: {
+    flex: 1,
     paddingHorizontal: 12,
     justifyContent: "center",
     borderRadius: radius.md,
+    overflow: "hidden",
+  },
+  iconActionFallback: {
     borderWidth: 1,
     borderColor: colors.outlineVariant,
   },
   deleteBtn: {
+    flex: 1,
     paddingHorizontal: 12,
     justifyContent: "center",
     borderRadius: radius.md,
+    overflow: "hidden",
+  },
+  deleteBtnFallback: {
     borderWidth: 1,
     borderColor: alpha(colors.errorContainer, 0.5),
   },
   deleteConfirm: {
+    flex: 1,
     paddingHorizontal: 12,
     justifyContent: "center",
     borderRadius: radius.md,
-    backgroundColor: colors.errorContainer,
+    overflow: "hidden",
   },
   deleteConfirmText: { fontSize: 11, fontWeight: "700", color: colors.onErrorContainer },
 }));

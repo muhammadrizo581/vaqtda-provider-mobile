@@ -10,7 +10,7 @@ import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Screen } from "@/components/pv/screen";
 import { useToast } from "@/components/pv/toast";
-import { Card, GlassIconButton, SmallButton, Spinner } from "@/components/pv/ui";
+import { Card, GlassIconButton, SelectPill, SmallButton, Spinner } from "@/components/pv/ui";
 import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { useProvider } from "@/context/ProviderContext";
@@ -149,25 +149,15 @@ export default function PaymentSettingsScreen() {
             <Card style={{ padding: 20, gap: 14 }}>
               {/* Birlik almashtirgich — % / so'm */}
               <View style={{ flexDirection: "row", gap: 8 }}>
-                {(["percent", "som"] as const).map((u) => {
-                  const active = unit === u;
-                  return (
-                    <Pressable
-                      key={u}
-                      onPress={() => setUnit(u)}
-                      style={[
-                        styles.unitPill,
-                        active
-                          ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                          : { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant },
-                      ]}
-                    >
-                      <Text style={[styles.unitText, { color: active ? colors.onPrimary : colors.onSurfaceVariant }]}>
-                        {u === "percent" ? t("paycfg.unit_percent") : t("paycfg.unit_som")}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+                {(["percent", "som"] as const).map((u) => (
+                  <SelectPill
+                    key={u}
+                    label={u === "percent" ? t("paycfg.unit_percent") : t("paycfg.unit_som")}
+                    active={unit === u}
+                    onPress={() => setUnit(u)}
+                    style={{ flex: 1 }}
+                  />
+                ))}
               </View>
 
               {unit === "percent" ? (
@@ -185,25 +175,14 @@ export default function PaymentSettingsScreen() {
                     <Text style={styles.suffix}>%</Text>
                   </View>
                   <View style={styles.chipRow}>
-                    {PERCENT_PRESETS.map((p) => {
-                      const active = Number(percentText) === p;
-                      return (
-                        <Pressable
-                          key={p}
-                          onPress={() => setPercentText(String(p))}
-                          style={[
-                            styles.chip,
-                            active
-                              ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                              : { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant },
-                          ]}
-                        >
-                          <Text style={[styles.chipText, { color: active ? colors.onPrimary : colors.onSurfaceVariant }]}>
-                            {p}%
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
+                    {PERCENT_PRESETS.map((p) => (
+                      <SelectPill
+                        key={p}
+                        label={`${p}%`}
+                        active={Number(percentText) === p}
+                        onPress={() => setPercentText(String(p))}
+                      />
+                    ))}
                   </View>
                   <Text style={styles.hint}>{t("paycfg.percent_hint")}</Text>
                 </>
@@ -222,25 +201,14 @@ export default function PaymentSettingsScreen() {
                     <Text style={styles.suffix}>{t("paycfg.unit_som")}</Text>
                   </View>
                   <View style={styles.chipRow}>
-                    {AMOUNT_PRESETS.map((a) => {
-                      const active = Number(amountDigits) === a;
-                      return (
-                        <Pressable
-                          key={a}
-                          onPress={() => setAmountDigits(String(a))}
-                          style={[
-                            styles.chip,
-                            active
-                              ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                              : { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant },
-                          ]}
-                        >
-                          <Text style={[styles.chipText, { color: active ? colors.onPrimary : colors.onSurfaceVariant }]}>
-                            {formatSom(a)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
+                    {AMOUNT_PRESETS.map((a) => (
+                      <SelectPill
+                        key={a}
+                        label={formatSom(a)}
+                        active={Number(amountDigits) === a}
+                        onPress={() => setAmountDigits(String(a))}
+                      />
+                    ))}
                   </View>
                   <Text style={styles.hint}>{t("paycfg.amount_hint")}</Text>
                 </>
@@ -280,15 +248,6 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   },
   radioDot: { width: 11, height: 11, borderRadius: 6 },
 
-  unitPill: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  unitText: { fontSize: 13, fontWeight: "700" },
-
   label: {
     fontSize: 11,
     fontWeight: "600",
@@ -309,12 +268,5 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   },
   suffix: { fontSize: 16, fontWeight: "700", color: colors.onSurfaceVariant },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  chipText: { fontSize: 12, fontWeight: "700" },
   hint: { fontSize: 12, color: colors.onSurfaceVariant, lineHeight: 17 },
 }));

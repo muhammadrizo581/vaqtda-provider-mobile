@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight, X } from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { GlassSurface } from "@/components/pv/ui";
 import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
@@ -105,22 +106,28 @@ export function MonthOverviewModal({
       <View style={styles.root}>
         {/* Sarlavha: oy navigatsiyasi + yopish */}
         <View style={styles.header}>
-          <Pressable onPress={() => setYm((cur) => shiftYm(cur, -1))} style={styles.navBtn} hitSlop={8}>
-            <ChevronLeft size={20} color={colors.onSurface} />
+          <Pressable onPress={() => setYm((cur) => shiftYm(cur, -1))} hitSlop={8}>
+            <GlassSurface style={styles.navBtn} fallbackStyle={styles.navBtnFallback} interactive>
+              <ChevronLeft size={20} color={colors.onSurface} />
+            </GlassSurface>
           </Pressable>
           <Text style={styles.title}>
             {UZ_MONTHS[month - 1]} {year}
           </Text>
           <Pressable
             onPress={() => canGoNext && setYm((cur) => shiftYm(cur, 1))}
-            style={[styles.navBtn, !canGoNext && { opacity: 0.3 }]}
+            style={!canGoNext && { opacity: 0.3 }}
             hitSlop={8}
           >
-            <ChevronRight size={20} color={colors.onSurface} />
+            <GlassSurface style={styles.navBtn} fallbackStyle={styles.navBtnFallback} interactive>
+              <ChevronRight size={20} color={colors.onSurface} />
+            </GlassSurface>
           </Pressable>
           <View style={{ flex: 1 }} />
-          <Pressable onPress={onClose} style={styles.closeBtn} hitSlop={8}>
-            <X size={18} color={colors.onSurfaceVariant} />
+          <Pressable onPress={onClose} hitSlop={8}>
+            <GlassSurface style={styles.navBtn} fallbackStyle={styles.navBtnFallback} interactive>
+              <X size={18} color={colors.onSurfaceVariant} />
+            </GlassSurface>
           </Pressable>
         </View>
 
@@ -194,7 +201,7 @@ export function MonthOverviewModal({
 
           {/* Tanlangan kun tafsilotlari */}
           {selected ? (
-            <View style={styles.detail}>
+            <GlassSurface style={styles.detail} fallbackStyle={styles.detailFallback}>
               <View style={styles.detailHeader}>
                 <Text style={styles.detailTitle}>
                   {UZ_WEEKDAYS[weekdayKeyOf(selected)]}, {formatUzDate(selected)}
@@ -240,7 +247,7 @@ export function MonthOverviewModal({
                   })}
                 </View>
               )}
-            </View>
+            </GlassSurface>
           ) : null}
         </ScrollView>
       </View>
@@ -265,6 +272,9 @@ const useStyles = makeThemedStyles((colors) =>
       borderRadius: 17,
       alignItems: "center",
       justifyContent: "center",
+      overflow: "hidden",
+    },
+    navBtnFallback: {
       backgroundColor: colors.surfaceContainer,
       borderWidth: 1,
       borderColor: colors.outlineVariant,
@@ -276,16 +286,6 @@ const useStyles = makeThemedStyles((colors) =>
       textTransform: "capitalize",
       minWidth: 120,
       textAlign: "center",
-    },
-    closeBtn: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: colors.surfaceContainer,
-      borderWidth: 1,
-      borderColor: colors.outlineVariant,
     },
     scroll: { padding: 16, paddingBottom: 48, gap: 14 },
 
@@ -332,11 +332,14 @@ const useStyles = makeThemedStyles((colors) =>
     },
 
     detail: {
+      borderRadius: radius.xl,
+      padding: 16,
+      overflow: "hidden",
+    },
+    detailFallback: {
       backgroundColor: colors.surfaceContainer,
       borderWidth: 1,
       borderColor: colors.outlineVariant,
-      borderRadius: radius.xl,
-      padding: 16,
     },
     detailHeader: {
       flexDirection: "row",

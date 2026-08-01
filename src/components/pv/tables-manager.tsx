@@ -4,12 +4,13 @@
 // "Ko'plab qo'shish": prefiks + raqam oralig'i bilan bir urinishda o'nlab birlik yaratish.
 import { Armchair, Layers, Monitor, Pencil, Plus, Save, Trash2, Users, X } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { StyleSheet, Text, TextInput, View } from "react-native";
 import { useToast } from "@/components/pv/toast";
 import {
   Card,
   EmptyState,
   GlassSurface,
+  SelectPill,
   SmallButton,
   Spinner,
   TogglePill,
@@ -299,20 +300,7 @@ export function TablesManager({ variant = "table" }: { variant?: "table" | "comp
               />
               <View style={styles.chipRow}>
                 {PC_TYPE_PRESETS.map((p) => (
-                  <Pressable
-                    key={p}
-                    onPress={() => setTypeVal(p)}
-                    style={[
-                      styles.chip,
-                      typeVal === p
-                        ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                        : { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant },
-                    ]}
-                  >
-                    <Text style={[styles.chipText, { color: typeVal === p ? colors.onPrimary : colors.onSurfaceVariant }]}>
-                      {p}
-                    </Text>
-                  </Pressable>
+                  <SelectPill key={p} label={p} active={typeVal === p} onPress={() => setTypeVal(p)} />
                 ))}
               </View>
             </View>
@@ -385,20 +373,7 @@ export function TablesManager({ variant = "table" }: { variant?: "table" | "comp
               />
               <View style={styles.chipRow}>
                 {PC_TYPE_PRESETS.map((p) => (
-                  <Pressable
-                    key={p}
-                    onPress={() => setTypeVal(p)}
-                    style={[
-                      styles.chip,
-                      typeVal === p
-                        ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                        : { backgroundColor: colors.surfaceContainerLowest, borderColor: colors.outlineVariant },
-                    ]}
-                  >
-                    <Text style={[styles.chipText, { color: typeVal === p ? colors.onPrimary : colors.onSurfaceVariant }]}>
-                      {p}
-                    </Text>
-                  </Pressable>
+                  <SelectPill key={p} label={p} active={typeVal === p} onPress={() => setTypeVal(p)} />
                 ))}
               </View>
             </View>
@@ -510,13 +485,6 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   },
 
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  chipText: { fontSize: 11, fontWeight: "700" },
 
   preview: {
     backgroundColor: colors.surfaceContainerLowest,

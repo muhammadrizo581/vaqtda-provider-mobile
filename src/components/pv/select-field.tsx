@@ -2,6 +2,7 @@
 import { Check, ChevronDown } from "lucide-react-native";
 import React, { useState } from "react";
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from "react-native";
+import { GlassSurface } from "@/components/pv/ui";
 import { radius } from "@/constants/colors";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 
@@ -43,7 +44,7 @@ export function SelectField({
 
       <Modal visible={open} transparent animationType="fade">
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <View style={styles.sheet}>
+          <GlassSurface style={styles.sheet} fallbackStyle={styles.sheetFallback}>
             <Text style={styles.sheetTitle}>{label}</Text>
             <FlatList showsVerticalScrollIndicator={false}
               data={options}
@@ -69,7 +70,7 @@ export function SelectField({
                 </Pressable>
               )}
             />
-          </View>
+          </GlassSurface>
         </Pressable>
       </Modal>
     </View>
@@ -106,9 +107,12 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     padding: 24,
   },
   sheet: {
-    backgroundColor: colors.surfaceContainerHigh,
     borderRadius: radius.xl,
     paddingVertical: 12,
+    overflow: "hidden",
+  },
+  sheetFallback: {
+    backgroundColor: colors.surfaceContainerHigh,
     borderWidth: 1,
     borderColor: colors.outlineVariant,
   },

@@ -14,6 +14,7 @@ import {
   GlassIconButton,
   GlassSurface,
   PageHeader,
+  SelectPill,
   SmallButton,
   Spinner,
   TogglePill,
@@ -242,10 +243,14 @@ function ServicesContent() {
 
       {/* Slots rejimida xizmat majburiy — faol xizmat bo'lmasa ogohlantirish */}
       {!daily && noActive && (
-        <View style={styles.warnBanner}>
+        <GlassSurface
+          style={styles.warnBanner}
+          fallbackStyle={styles.warnBannerFallback}
+          tintColor={alpha(colors.errorContainer, 0.35)}
+        >
           <AlertCircle size={15} color={colors.error} />
           <Text style={styles.warnText}>{t("svc.required_warn")}</Text>
-        </View>
+        </GlassSurface>
       )}
 
       {!formOpen && (
@@ -290,36 +295,15 @@ function ServicesContent() {
             <Text style={styles.label}>{t("svc.duration")}</Text>
             <View style={styles.durationRow}>
               {DURATION_PRESETS.map((d) => (
-                <Pressable
+                <SelectPill
                   key={d}
+                  label={String(d)}
+                  active={duration === d && !customDuration}
                   onPress={() => {
                     setDuration(d);
                     setCustomDuration("");
                   }}
-                  style={[
-                    styles.durationBtn,
-                    duration === d && !customDuration
-                      ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                      : {
-                          backgroundColor: colors.surfaceContainerLowest,
-                          borderColor: colors.outlineVariant,
-                        },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.durationText,
-                      {
-                        color:
-                          duration === d && !customDuration
-                            ? colors.onPrimary
-                            : colors.onSurfaceVariant,
-                      },
-                    ]}
-                  >
-                    {d}
-                  </Text>
-                </Pressable>
+                />
               ))}
               <TextInput
                 value={customDuration}
@@ -421,20 +405,36 @@ function ServicesContent() {
                 onPress={() => openEdit(s)}
                 style={{ flex: 1 }}
               />
-              <Pressable style={styles.iconAction} onPress={() => toggleActive(s)}>
-                {s.is_active ? (
-                  <EyeOff size={14} color={colors.onSurfaceVariant} />
-                ) : (
-                  <Eye size={14} color={colors.onSurfaceVariant} />
-                )}
+              <Pressable onPress={() => toggleActive(s)}>
+                <GlassSurface style={styles.iconAction} fallbackStyle={styles.iconActionFallback} interactive>
+                  {s.is_active ? (
+                    <EyeOff size={14} color={colors.onSurfaceVariant} />
+                  ) : (
+                    <Eye size={14} color={colors.onSurfaceVariant} />
+                  )}
+                </GlassSurface>
               </Pressable>
               {deleteId === s.id ? (
-                <Pressable style={styles.deleteConfirm} onPress={() => remove(s.id)}>
-                  <Text style={styles.deleteConfirmText}>{t("svc.delete_q")}</Text>
+                <Pressable onPress={() => remove(s.id)}>
+                  <GlassSurface
+                    style={styles.deleteConfirm}
+                    fallbackStyle={{ backgroundColor: colors.errorContainer }}
+                    tintColor={alpha(colors.errorContainer, 0.6)}
+                    interactive
+                  >
+                    <Text style={styles.deleteConfirmText}>{t("svc.delete_q")}</Text>
+                  </GlassSurface>
                 </Pressable>
               ) : (
-                <Pressable style={styles.deleteBtn} onPress={() => setDeleteId(s.id)}>
-                  <Trash2 size={14} color={colors.error} />
+                <Pressable onPress={() => setDeleteId(s.id)}>
+                  <GlassSurface
+                    style={styles.deleteBtn}
+                    fallbackStyle={styles.deleteBtnFallback}
+                    tintColor={alpha(colors.errorContainer, 0.3)}
+                    interactive
+                  >
+                    <Trash2 size={14} color={colors.error} />
+                  </GlassSurface>
                 </Pressable>
               )}
             </View>
@@ -459,12 +459,15 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 10,
-    backgroundColor: alpha(colors.errorContainer, 0.2),
-    borderWidth: 1,
-    borderColor: alpha(colors.error, 0.4),
     borderRadius: radius.lg,
     paddingHorizontal: 14,
     paddingVertical: 12,
+    overflow: "hidden",
+  },
+  warnBannerFallback: {
+    backgroundColor: alpha(colors.errorContainer, 0.2),
+    borderWidth: 1,
+    borderColor: alpha(colors.error, 0.4),
   },
   warnText: { flex: 1, fontSize: 13, fontWeight: "500", color: colors.onSurface, lineHeight: 18 },
 
@@ -502,13 +505,6 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   },
   hint: { fontSize: 11, color: colors.onSurfaceVariant, marginTop: 4 },
   durationRow: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
-  durationBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: radius.md,
-    borderWidth: 1,
-  },
-  durationText: { fontSize: 12, fontWeight: "700" },
   durationInput: { width: 72, paddingVertical: 8, fontSize: 12, fontWeight: "700" },
 
   svcTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
@@ -555,24 +551,33 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     borderTopColor: colors.outlineVariant,
   },
   iconAction: {
+    flex: 1,
     paddingHorizontal: 12,
     justifyContent: "center",
     borderRadius: radius.md,
+    overflow: "hidden",
+  },
+  iconActionFallback: {
     borderWidth: 1,
     borderColor: colors.outlineVariant,
   },
   deleteBtn: {
+    flex: 1,
     paddingHorizontal: 12,
     justifyContent: "center",
     borderRadius: radius.md,
+    overflow: "hidden",
+  },
+  deleteBtnFallback: {
     borderWidth: 1,
     borderColor: alpha(colors.errorContainer, 0.5),
   },
   deleteConfirm: {
+    flex: 1,
     paddingHorizontal: 12,
     justifyContent: "center",
     borderRadius: radius.md,
-    backgroundColor: colors.errorContainer,
+    overflow: "hidden",
   },
   deleteConfirmText: { fontSize: 11, fontWeight: "700", color: colors.onErrorContainer },
 }));

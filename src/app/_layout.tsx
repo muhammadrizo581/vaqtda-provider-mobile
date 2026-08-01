@@ -5,6 +5,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useState } from "react";
 import { View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AnimatedLogo } from "@/components/animated-logo";
 import { ToastProvider } from "@/components/pv/toast";
@@ -93,18 +94,20 @@ function ThemedApp() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <LanguageProvider>
-          <AuthProvider>
-            <ProviderProvider>
-              <ToastProvider>
-                <ThemedApp />
-              </ToastProvider>
-            </ProviderProvider>
-          </AuthProvider>
-        </LanguageProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <AuthProvider>
+              <ProviderProvider>
+                <ToastProvider>
+                  <ThemedApp />
+                </ToastProvider>
+              </ProviderProvider>
+            </AuthProvider>
+          </LanguageProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

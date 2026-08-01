@@ -691,6 +691,11 @@ export const uz = {
   "pv.theme_system": "Tizim",
   "pv.search_ph": "Mijoz, telefon yoki xizmat bo'yicha qidirish...",
 
+  // ── QR kod ──
+  "pv.qr_title": "Mening QR kodim",
+  "pv.qr_sub": "Mijoz bu QR ni skaner qilsa, Vaqtda ilovasida sahifangiz ochiladi va bron qila oladi.",
+  "pv.qr_share": "Ulashish",
+
   // ── Bank kartalari ──
   "pv.more_cards": "Bank kartalari",
   "pv.more_cards_sub": "Kartalar, balans va to'lovlar tarixi",

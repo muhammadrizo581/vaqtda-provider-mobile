@@ -204,19 +204,22 @@ export default function StatsScreen() {
       {/* Davr almashtirgich — shisha segment konteyner */}
       <GlassSurface style={styles.periodRow} fallbackStyle={styles.periodRowFallback}>
         {periods.map((p) => (
-          <Pressable
-            key={p.key}
-            onPress={() => setPeriod(p.key)}
-            style={[styles.periodBtn, period === p.key && { backgroundColor: colors.primary }]}
-          >
-            <Text
-              style={[
-                styles.periodText,
-                { color: period === p.key ? colors.onPrimary : colors.onSurfaceVariant },
-              ]}
+          <Pressable key={p.key} onPress={() => setPeriod(p.key)}>
+            <GlassSurface
+              style={styles.periodBtn}
+              fallbackStyle={period === p.key ? { backgroundColor: colors.primary } : undefined}
+              tintColor={period === p.key ? colors.primary : undefined}
+              interactive
             >
-              {p.label}
-            </Text>
+              <Text
+                style={[
+                  styles.periodText,
+                  { color: period === p.key ? colors.onPrimary : colors.onSurfaceVariant },
+                ]}
+              >
+                {p.label}
+              </Text>
+            </GlassSurface>
           </Pressable>
         ))}
       </GlassSurface>
@@ -306,7 +309,7 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.outlineVariant,
   },
-  periodBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
+  periodBtn: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999, overflow: "hidden" },
   periodText: { fontSize: 12, fontWeight: "700" },
 
   kpiGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },

@@ -87,7 +87,7 @@ function GlassSegmented({
 export default function LoginScreen() {
   const colors = useColors();
   const styles = useStyles();
-  const { login, logout, user, isAuthenticated } = useAuth();
+  const { login } = useAuth();
   const { t, lang, setLang } = useLanguage();
   const insets = useSafeAreaInsets();
 
@@ -113,9 +113,6 @@ export default function LoginScreen() {
     // Yopiq holatda karta gap'ining bittasini yutib yuboradi (16 + 0 + 16 → 16)
     marginBottom: 16 * (reg.value - 1),
   }));
-
-  // Kirgan, lekin provider emas — chiqish taklif qilinadi (web'dagi dashboard guard)
-  const notProvider = isAuthenticated && user?.role !== "provider";
 
   const switchMode = (m: Mode) => {
     setMode(m);
@@ -222,111 +219,102 @@ export default function LoginScreen() {
         />
 
         <GlassSurface style={styles.card} fallbackStyle={styles.cardFallback}>
-          {notProvider ? (
-            <>
-              <View style={styles.errorBox}>
-                <Text style={styles.errorText}>{t("auth.not_provider")}</Text>
-              </View>
-              <Pressable style={styles.submitBtn} onPress={logout}>
-                <Text style={styles.submitText}>{t("auth.logout")}</Text>
-              </Pressable>
-            </>
-          ) : (
-            <>
-              {error ? (
-                <View style={styles.errorBox}>
-                  <Text style={styles.errorText}>{error}</Text>
-                </View>
-              ) : null}
+          {error ? (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          ) : null}
 
-              {/* Register maydonlari — balandligi bounce'siz ochilib-yopiladi */}
-              <Animated.View style={[styles.fieldsClip, fieldsStyle]}>
-                <View
-                  style={styles.fieldsContent}
-                  onLayout={(e) => setFieldsH(e.nativeEvent.layout.height)}
-                >
-                  <View style={styles.inputWrap}>
-                    <User size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
-                    <TextInput
-                      value={fullName}
-                      onChangeText={setFullName}
-                      placeholder={t("auth.full_name")}
-                      placeholderTextColor={colors.outline}
-                      autoComplete="name"
-                      style={styles.input}
-                    />
-                  </View>
-                  <View style={styles.inputWrap}>
-                    <Store size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
-                    <TextInput
-                      value={businessName}
-                      onChangeText={setBusinessName}
-                      placeholder={t("auth.business_name")}
-                      placeholderTextColor={colors.outline}
-                      style={styles.input}
-                    />
-                  </View>
-                  <View style={styles.inputWrap}>
-                    <Phone size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
-                    <Text style={styles.phonePrefix}>+998</Text>
-                    <TextInput
-                      value={phone}
-                      onChangeText={(v) => setPhone(v.replace(/\D/g, "").slice(0, 9))}
-                      placeholder="90 123 45 67"
-                      placeholderTextColor={colors.outline}
-                      autoComplete="tel"
-                      keyboardType="phone-pad"
-                      style={[styles.input, styles.phoneInput]}
-                    />
-                  </View>
-                </View>
-              </Animated.View>
-
+          {/* Register maydonlari — balandligi bounce'siz ochilib-yopiladi */}
+          <Animated.View style={[styles.fieldsClip, fieldsStyle]}>
+            <View
+              style={styles.fieldsContent}
+              onLayout={(e) => setFieldsH(e.nativeEvent.layout.height)}
+            >
               <View style={styles.inputWrap}>
-                <Mail size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
+                <User size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
                 <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder={t("auth.email_placeholder")}
+                  value={fullName}
+                  onChangeText={setFullName}
+                  placeholder={t("auth.full_name")}
                   placeholderTextColor={colors.outline}
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  keyboardType="email-address"
+                  autoComplete="name"
                   style={styles.input}
                 />
               </View>
               <View style={styles.inputWrap}>
-                <Lock size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
+                <Store size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
                 <TextInput
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder={t("auth.password_placeholder")}
+                  value={businessName}
+                  onChangeText={setBusinessName}
+                  placeholder={t("auth.business_name")}
                   placeholderTextColor={colors.outline}
-                  secureTextEntry
-                  autoComplete="password"
                   style={styles.input}
-                  onSubmitEditing={handleSubmit}
                 />
               </View>
+              <View style={styles.inputWrap}>
+                <Phone size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
+                <Text style={styles.phonePrefix}>+998</Text>
+                <TextInput
+                  value={phone}
+                  onChangeText={(v) => setPhone(v.replace(/\D/g, "").slice(0, 9))}
+                  placeholder="90 123 45 67"
+                  placeholderTextColor={colors.outline}
+                  autoComplete="tel"
+                  keyboardType="phone-pad"
+                  style={[styles.input, styles.phoneInput]}
+                />
+              </View>
+            </View>
+          </Animated.View>
 
-              <Pressable
-                onPress={handleSubmit}
-                disabled={pending}
-                style={({ pressed }) => [
-                  styles.submitBtn,
-                  { opacity: pending ? 0.7 : pressed ? 0.9 : 1 },
-                ]}
-              >
-                {pending ? (
-                  <AnimatedLogo variant="loading" size={20} background={null} foreground={colors.onPrimary} />
-                ) : (
-                  <Text style={styles.submitText}>
-                    {mode === "login" ? t("auth.login") : t("auth.create_account")}
-                  </Text>
-                )}
-              </Pressable>
-            </>
-          )}
+          <View style={styles.inputWrap}>
+            <Mail size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
+            <TextInput
+              value={email}
+              onChangeText={setEmail}
+              placeholder={t("auth.email_placeholder")}
+              placeholderTextColor={colors.outline}
+              autoCapitalize="none"
+              autoComplete="email"
+              keyboardType="email-address"
+              style={styles.input}
+            />
+          </View>
+          <View style={styles.inputWrap}>
+            <Lock size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
+            <TextInput
+              value={password}
+              onChangeText={setPassword}
+              placeholder={t("auth.password_placeholder")}
+              placeholderTextColor={colors.outline}
+              secureTextEntry
+              autoComplete="password"
+              style={styles.input}
+              onSubmitEditing={handleSubmit}
+            />
+          </View>
+
+          <Pressable
+            onPress={handleSubmit}
+            disabled={pending}
+            style={({ pressed }) => ({ opacity: pending ? 0.7 : pressed ? 0.9 : 1 })}
+          >
+            <GlassSurface
+              style={styles.submitBtn}
+              fallbackStyle={{ backgroundColor: colors.primary }}
+              tintColor={colors.primary}
+              interactive
+            >
+              {pending ? (
+                <AnimatedLogo variant="loading" size={20} background={null} foreground={colors.onPrimary} />
+              ) : (
+                <Text style={styles.submitText}>
+                  {mode === "login" ? t("auth.login") : t("auth.create_account")}
+                </Text>
+              )}
+            </GlassSurface>
+          </Pressable>
         </GlassSurface>
 
         {/* Til almashtirish — xuddi shu glass kapsula, ixcham */}
@@ -442,11 +430,11 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     color: colors.onSurface,
   },
   submitBtn: {
-    backgroundColor: colors.primary,
     borderRadius: radius.xl,
     paddingVertical: 15,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   submitText: { color: colors.onPrimary, fontWeight: "800", fontSize: 14 },
 

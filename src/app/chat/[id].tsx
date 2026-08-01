@@ -301,9 +301,9 @@ export default function ChatThreadScreen() {
                   {/* Kun ajratgichi */}
                   {newDay && (
                     <View style={styles.dayWrap}>
-                      <View style={styles.dayChip}>
+                      <GlassSurface style={styles.dayChip} fallbackStyle={styles.dayChipFallback}>
                         <Text style={styles.dayText}>{formatChatDay(m.created_at, t)}</Text>
-                      </View>
+                      </GlassSurface>
                     </View>
                   )}
                   <View style={[styles.msgRow, { justifyContent: mine ? "flex-end" : "flex-start" }]}>
@@ -439,11 +439,12 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
 
   dayWrap: { alignItems: "center", paddingVertical: 8 },
   dayChip: {
-    backgroundColor: colors.surfaceContainerHigh,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
+    overflow: "hidden",
   },
+  dayChipFallback: { backgroundColor: colors.surfaceContainerHigh },
   dayText: { fontSize: 10, fontWeight: "700", color: colors.onSurfaceVariant },
 
   msgRow: { flexDirection: "row" },

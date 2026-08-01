@@ -3,6 +3,7 @@
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import React, { useState } from "react";
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { GlassSurface } from "@/components/pv/ui";
 import { radius } from "@/constants/colors";
 import { makeThemedStyles, useColors, useTheme } from "@/context/ThemeContext";
 
@@ -58,18 +59,27 @@ export function TimeField({
       {Platform.OS === "ios" && (
         <Modal visible={open} transparent animationType="fade">
           <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-            <Pressable style={styles.sheet} onPress={() => {}}>
-              <DateTimePicker
-                value={toDate(value)}
-                mode="time"
-                display="spinner"
-                onChange={handleChange}
-                themeVariant={scheme}
-                locale="uz-UZ"
-              />
-              <Pressable style={styles.doneBtn} onPress={() => setOpen(false)}>
-                <Text style={styles.doneText}>OK</Text>
-              </Pressable>
+            <Pressable onPress={() => {}}>
+              <GlassSurface style={styles.sheet} fallbackStyle={styles.sheetFallback}>
+                <DateTimePicker
+                  value={toDate(value)}
+                  mode="time"
+                  display="spinner"
+                  onChange={handleChange}
+                  themeVariant={scheme}
+                  locale="uz-UZ"
+                />
+                <Pressable onPress={() => setOpen(false)}>
+                  <GlassSurface
+                    style={styles.doneBtn}
+                    fallbackStyle={{ backgroundColor: colors.primary }}
+                    tintColor={colors.primary}
+                    interactive
+                  >
+                    <Text style={styles.doneText}>OK</Text>
+                  </GlassSurface>
+                </Pressable>
+              </GlassSurface>
             </Pressable>
           </Pressable>
         </Modal>
@@ -103,18 +113,21 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
-    backgroundColor: colors.surfaceContainerHigh,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
     paddingBottom: 32,
     paddingTop: 8,
+    overflow: "hidden",
+  },
+  sheetFallback: {
+    backgroundColor: colors.surfaceContainerHigh,
   },
   doneBtn: {
     marginHorizontal: 20,
-    backgroundColor: colors.primary,
     borderRadius: radius.md,
     paddingVertical: 12,
     alignItems: "center",
+    overflow: "hidden",
   },
   doneText: { color: colors.onPrimary, fontWeight: "700", fontSize: 14 },
 }));

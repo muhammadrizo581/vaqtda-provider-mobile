@@ -49,6 +49,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             ? "provider"
             : "client";
 
+      if (role !== "provider") {
+        // Provayder bo'lmagan akkaunt panelga kirmaydi — sessiya jimgina yopiladi.
+        // setTimeout: onAuthStateChange callback ichida auth metodini chaqirish deadlock beradi.
+        setUser(null);
+        setIsAuthenticated(false);
+        setTimeout(() => {
+          supabase.auth.signOut();
+        }, 0);
+        return;
+      }
+
       setUser({
         id: userId,
         name: fullName || email.split("@")[0],
@@ -93,8 +104,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
+
+    // Rol tekshiruvi: provayder bo'lmasa sessiya yopiladi va xato matni
+    // parol xatosidan farq qilmaydi — rol haqida hech narsa oshkor qilinmaydi.
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.user.id)
+      .maybeSingle();
+    const dbRole = (profile?.role || "client").toLowerCase();
+    const isProvider = dbRole === "provider" || dbRole === "specialist" || dbRole === "partner";
+    if (!isProvider) {
+      await supabase.auth.signOut();
+      return { error: "invalid_credentials" };
+    }
     return {};
   };
 

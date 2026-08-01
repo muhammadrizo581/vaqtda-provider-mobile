@@ -421,19 +421,29 @@ export default function BusinessProfileScreen() {
               <View key={img.uri + i} style={styles.imageWrap}>
                 <Image source={{ uri: img.uri }} style={styles.image} contentFit="cover" />
                 <Pressable style={styles.imageRemove} onPress={() => removeImage(i)}>
-                  <X size={12} color={colors.onErrorContainer} />
+                  <GlassSurface
+                    style={styles.imageBtnGlass}
+                    fallbackStyle={{ backgroundColor: colors.errorContainer }}
+                    tintColor={alpha(colors.errorContainer, 0.6)}
+                    interactive
+                  >
+                    <X size={12} color={colors.onErrorContainer} />
+                  </GlassSurface>
                 </Pressable>
-                <Pressable
-                  style={[
-                    styles.imagePrimary,
-                    img.is_primary && { backgroundColor: colors.primary },
-                  ]}
-                  onPress={() => togglePrimary(i)}
-                >
-                  <Star
-                    size={12}
-                    color={img.is_primary ? colors.onPrimary : colors.onSurfaceVariant}
-                  />
+                <Pressable style={styles.imagePrimary} onPress={() => togglePrimary(i)}>
+                  <GlassSurface
+                    style={styles.imageBtnGlass}
+                    fallbackStyle={{
+                      backgroundColor: img.is_primary ? colors.primary : alpha("#000000", 0.5),
+                    }}
+                    tintColor={img.is_primary ? colors.primary : undefined}
+                    interactive
+                  >
+                    <Star
+                      size={12}
+                      color={img.is_primary ? colors.onPrimary : colors.onSurfaceVariant}
+                    />
+                  </GlassSurface>
                 </Pressable>
               </View>
             ))}
@@ -508,9 +518,7 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: colors.errorContainer,
-    alignItems: "center",
-    justifyContent: "center",
+    overflow: "hidden",
   },
   imagePrimary: {
     position: "absolute",
@@ -519,9 +527,14 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: alpha("#000000", 0.5),
+    overflow: "hidden",
+  },
+  imageBtnGlass: {
+    flex: 1,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
   },
   addImage: {
     width: 88,
