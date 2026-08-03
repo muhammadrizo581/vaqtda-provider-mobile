@@ -31,15 +31,15 @@ export default function SettingsScreen() {
 
   const businessName = localize(provider?.business_name, lang) || provider?.slug || "";
 
-  // QR ichidagi link — mijoz ilovasi (Vaqtda) shu scheme'ni ochadi.
-  // Expo Go'da vaqtda:// scheme ishlamaydi, shuning uchun dev'da exp:// link
-  // beramiz: kamera skaner qilsa Expo Go ochilib mijoz ilovasiga kirib ketadi.
-  // Mijoz ilovasining Metro serveri shu kompyuterda 8081-portda turishi kerak.
+  // QR ichidagi link — universal https havola: ilova o'rnatilmagan mijozda ham
+  // brauzerda provayder sahifasi (vaqtda.uz/[slug]) ochilib, bron qila oladi.
+  // Dev'da esa exp:// link: kamera skaner qilsa Expo Go ochilib mijoz
+  // ilovasiga kirib ketadi (Metro shu kompyuterda 8081-portda turishi kerak).
   const devHost = Constants.expoConfig?.hostUri?.split(":")[0];
   const qrUrl = provider?.slug
     ? __DEV__ && devHost
       ? `exp://${devHost}:8081/--/provider/${provider.slug}`
-      : `vaqtda://provider/${provider.slug}`
+      : `https://vaqtda.uz/${provider.slug}`
     : null;
 
   const handleShareQr = async () => {
@@ -157,7 +157,11 @@ export default function SettingsScreen() {
           {themeOptions.map(({ value, label, icon: Icon }) => {
             const active = mode === value;
             return (
-              <Pressable key={value} onPress={() => setMode(value)} style={{ flex: 1 }}>
+              <Pressable
+                key={value}
+                onPress={(e) => setMode(value, { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
+                style={{ flex: 1 }}
+              >
                 <GlassSurface
                   style={[styles.langPill, { flexDirection: "row", justifyContent: "center", gap: 6 }]}
                   fallbackStyle={[

@@ -1,6 +1,7 @@
 // Auth konteksti — saytdagi context/AuthContext.tsx dan port.
 // Yo'naltirish (redirect) bu yerda emas, app/_layout.tsx dagi guard'da qilinadi.
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { clearPushToken } from "@/lib/push";
 import { supabase } from "@/lib/supabase";
 
 interface User {
@@ -15,7 +16,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<{ error?: string }>;
+  login: (identifier: string, password: string) => Promise<{ error?: string }>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -103,7 +104,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const login = async (email: string, password: string) => {
+  // identifier: email YOKI username. "@" bo'lmasa username deb qaraladi va
+  // email_for_username RPC orqali emailga aylantiriladi (migratsiya: profile_usernames).
+  const login = async (identifier: string, password: string) => {
+    let email = identifier.trim();
+    if (!email.includes("@")) {
+      const { data: resolved } = await supabase.rpc("email_for_username", { uname: email });
+      if (!resolved) return { error: "invalid_credentials" };
+      email = resolved as string;
+    }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
 
@@ -124,6 +133,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    // Chiqishdan oldin push token tozalanadi — eski qurilmaga xabar bormasin
+    if (user) await clearPushToken(user.id);
     await supabase.auth.signOut();
     setUser(null);
     setIsAuthenticated(false);

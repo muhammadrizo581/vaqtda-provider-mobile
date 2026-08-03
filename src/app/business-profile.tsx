@@ -81,6 +81,20 @@ export default function BusinessProfileScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState("");
 
+  // Yangi biznes yaratilayotganda slug profildagi username'dan boshlanadi —
+  // slug va username har doim bir xil turadi (DB trigger ham sinxron saqlaydi).
+  useEffect(() => {
+    if (provider || !user) return;
+    (async () => {
+      const { data } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (data?.username) setSlug((prev) => prev || data.username);
+    })();
+  }, [provider, user]);
+
   // Kategoriya va hududlarni yuklaymiz
   useEffect(() => {
     (async () => {
@@ -206,17 +220,21 @@ export default function BusinessProfileScreen() {
         }
       }
 
-      const baseSlug = slug.trim() || businessName;
-      const formattedSlug = baseSlug
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9\s\-_]/g, "")
-        .replace(/\s+/g, "-")
-        .replace(/-+/g, "-");
+      // Slug = username qoidasi: maydon bo'sh qolsa slug yubormaymiz —
+      // yangi biznesda DB trigger username'dan qo'yadi, tahrirda eskisi qoladi.
+      // Slug o'zgartirilsa DB trigger profildagi username'ni ham yangilaydi.
+      const trimmedSlug = slug.trim();
+      const formattedSlug = trimmedSlug
+        ? trimmedSlug
+            .toLowerCase()
+            .replace(/[^a-z0-9\s\-_.]/g, "")
+            .replace(/\s+/g, "-")
+            .replace(/-+/g, "-")
+        : null;
 
       const payload = {
         business_name: businessName,
-        slug: formattedSlug,
+        ...(formattedSlug ? { slug: formattedSlug } : {}),
         location: `${mapCoordinates[0]}, ${mapCoordinates[1]}`,
         about: aboutValue,
         category_id: selectedCategoryId,

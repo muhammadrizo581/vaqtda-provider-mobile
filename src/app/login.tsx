@@ -273,11 +273,12 @@ export default function LoginScreen() {
             <TextInput
               value={email}
               onChangeText={setEmail}
-              placeholder={t("auth.email_placeholder")}
+              // Kirishda email ham, username ham bo'ladi; ro'yxatda faqat email
+              placeholder={mode === "login" ? t("auth.email_or_username") : t("auth.email_placeholder")}
               placeholderTextColor={colors.outline}
               autoCapitalize="none"
-              autoComplete="email"
-              keyboardType="email-address"
+              autoComplete={mode === "login" ? "username" : "email"}
+              keyboardType={mode === "login" ? "default" : "email-address"}
               style={styles.input}
             />
           </View>

@@ -1,5 +1,5 @@
-// Kirish splash'i — mijoz ilovasi (vaqtda-mobile) bilan bir xil VaqtdaIntro:
-// yashil radial gradient → barglar gullab ochiladi → galochka chiziladi →
+// Kirish splash'i — VaqtdaIntro, provayder UI (indigo) ranglarida:
+// indigo radial gradient → barglar gullab ochiladi → galochka chiziladi →
 // "Vaqtda" so'zi ko'tariladi → sahna xiralashib yo'qoladi (~2.4s), so'ng onDone.
 import React from "react";
 import { VaqtdaIntro } from "@/components/vaqtda-logo";

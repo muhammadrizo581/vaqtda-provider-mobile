@@ -8,6 +8,7 @@ import { View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AnimatedLogo } from "@/components/animated-logo";
+import { PushSideEffects } from "@/components/pv/push-side-effects";
 import { ToastProvider } from "@/components/pv/toast";
 import { VaqtdaSplash } from "@/components/vaqtda-splash";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -32,6 +33,7 @@ function RootNavigator() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      <PushSideEffects />
       {!loading && (
         <Stack
           screenOptions={{

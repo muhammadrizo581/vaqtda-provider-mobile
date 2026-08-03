@@ -40,6 +40,7 @@ export const ru: Record<TKey, string> = {
   "auth.client": "Клиент",
   "auth.provider": "Специалист",
   "auth.email_placeholder": "Электронная почта",
+  "auth.email_or_username": "Email или username",
   "auth.password_placeholder": "Пароль",
   "auth.forgot": "Забыли пароль?",
   "auth.get_started": "Начать",
@@ -448,7 +449,7 @@ export const ru: Record<TKey, string> = {
   "ab.business_name": "Название бизнеса",
   "ab.business_name_ph": "напр.: Барбершоп, Салон красоты",
   "ab.slug": "Ссылка профиля (slug)",
-  "ab.slug_hint": "Уникальная ссылка. Напр. 'muhammadrizo' — клиенты найдут вас на /muhammadrizo.",
+  "ab.slug_hint": "Уникальная ссылка и одновременно ваш username для входа. Изменится ссылка — изменится и логин.",
   "ab.category": "Категория услуг",
   "ab.loading_categories": "Загрузка категорий...",
   "ab.no_categories": "Нет категорий",
@@ -694,7 +695,7 @@ export const ru: Record<TKey, string> = {
 
   // ── QR-код ──
   "pv.qr_title": "Мой QR-код",
-  "pv.qr_sub": "Клиент сканирует этот QR — в приложении Vaqtda откроется ваша страница, где можно записаться.",
+  "pv.qr_sub": "Клиент сканирует этот QR — откроется ваша страница, где можно записаться. Приложение не обязательно.",
   "pv.qr_share": "Поделиться",
 
   // ── Банковские карты ──

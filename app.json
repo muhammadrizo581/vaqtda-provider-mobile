@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "vaqtdaprovidermobile",
     "userInterfaceStyle": "automatic",
-    "backgroundColor": "#0c1310",
+    "backgroundColor": "#0b0d12",
     "ios": {
       "icon": "./assets/expo.icon"
     },
@@ -31,16 +31,27 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0c1310",
+          "backgroundColor": "#0b0d12",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 100
         }
       ],
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "color": "#4C8156"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "c6049643-e23e-47c4-b3b7-4861d26bcf76"
+      }
     }
   }
 }

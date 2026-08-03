@@ -147,7 +147,7 @@ export function VaqtdaRefreshing({ refreshing, color }: { refreshing: boolean; c
 
 /**
  * VaqtdaIntro — ilova kirishidagi splash (intro.zip: VaqtdaSplash).
- * Yashil radial gradient fon → oq barglar ketma-ket "ochiladi" (bloom) →
+ * Indigo radial gradient fon → oq barglar ketma-ket "ochiladi" (bloom) →
  * tasdiq belgisi chiziladi → "Vaqtda" nomi paydo bo'ladi → sahna xiralashib
  * yo'qoladi. Jami ~2.4s.
  *
@@ -210,13 +210,13 @@ export function VaqtdaIntro({
 
   return (
     <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: sceneOpacity, zIndex: 999 }]}>
-      {/* Yashil radial gradient fon (intro.zip: 6e8d6e → 567157 → 46603f) */}
+      {/* Indigo radial gradient fon — provayder UI palitrasi (primary indigo) */}
       <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
         <Defs>
           <RadialGradient id="vqIntroBg" cx="50%" cy="34%" r="90%">
-            <Stop offset="0%" stopColor="#6e8d6e" />
-            <Stop offset="52%" stopColor="#567157" />
-            <Stop offset="100%" stopColor="#46603f" />
+            <Stop offset="0%" stopColor="#7c86f2" />
+            <Stop offset="52%" stopColor="#4f46e5" />
+            <Stop offset="100%" stopColor="#332b9e" />
           </RadialGradient>
         </Defs>
         <Rect x="0" y="0" width="100%" height="100%" fill="url(#vqIntroBg)" />

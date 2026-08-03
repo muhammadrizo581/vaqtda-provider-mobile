@@ -38,6 +38,7 @@ export const uz = {
   "auth.client": "Mijoz",
   "auth.provider": "Provayder",
   "auth.email_placeholder": "Email manzil",
+  "auth.email_or_username": "Email yoki username",
   "auth.password_placeholder": "Parol",
   "auth.forgot": "Parolni unutdingizmi?",
   "auth.get_started": "Boshlash",
@@ -446,7 +447,7 @@ export const uz = {
   "ab.business_name": "Biznes nomi",
   "ab.business_name_ph": "masalan: Sartaroshxona, Go'zallik saloni",
   "ab.slug": "Profil havolasi (slug)",
-  "ab.slug_hint": "Noyob havola. Masalan 'muhammadrizo' yozsangiz, mijozlar sizni /muhammadrizo da topadi.",
+  "ab.slug_hint": "Noyob havola va ayni paytda login username'ingiz. O'zgartirsangiz, kirishda ham yangi nom bilan kirasiz.",
   "ab.category": "Xizmat kategoriyasi",
   "ab.loading_categories": "Kategoriyalar yuklanmoqda...",
   "ab.no_categories": "Kategoriyalar yo'q",
@@ -693,7 +694,7 @@ export const uz = {
 
   // ── QR kod ──
   "pv.qr_title": "Mening QR kodim",
-  "pv.qr_sub": "Mijoz bu QR ni skaner qilsa, Vaqtda ilovasida sahifangiz ochiladi va bron qila oladi.",
+  "pv.qr_sub": "Mijoz bu QR ni skaner qilsa, sahifangiz ochiladi va bron qila oladi — ilova shart emas.",
   "pv.qr_share": "Ulashish",
 
   // ── Bank kartalari ──
