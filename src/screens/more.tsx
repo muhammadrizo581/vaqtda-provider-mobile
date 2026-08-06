@@ -1,10 +1,9 @@
 // "Boshqa" — tizimning UIKit "More" ekrani o'rniga o'zimizning shisha menyu.
 // Jadval, Xizmatlar/Stollar/Kompyuterlar, Statistika, Biznes profil, Sozlamalar.
 //
-// Klinika xodimi (shifokor) uchun ro'yxat qisqaradi: o'z jadvali, o'z
-// xizmatlari, o'z statistikasi, klinika profili (faqat ko'rish), sozlamalar va
-// chiqish. Biznes boshqaruvi (bo'limlar, shifokorlar, kartalar, to'lov)
-// ko'rsatilmaydi.
+// Xodim (usta/shifokor) uchun ro'yxat qisqaradi: o'z jadvali, o'z xizmatlari,
+// o'z statistikasi, biznes profili (faqat ko'rish), sozlamalar va chiqish.
+// Biznes boshqaruvi (bo'limlar, ustalar/shifokorlar, kartalar, to'lov) ko'rsatilmaydi.
 import { useRouter, type Href } from "expo-router";
 import {
   Armchair,
@@ -20,6 +19,7 @@ import {
   Stethoscope,
   Store,
   Tag,
+  Users,
   UtensilsCrossed,
   Wallet,
   type LucideIcon,
@@ -60,9 +60,16 @@ export default function MoreScreen() {
   const clinicName = localize(provider?.business_name, lang) || provider?.slug || "";
 
   // Klinika jadval rejimi: "shared" — jadval butun biznesga umumiy (uni faqat
-  // rahbar tuzadi), aks holda har bir shifokor o'z jadvalini o'zi tuzadi.
+  // rahbar tuzadi), aks holda har bir xodim o'z jadvalini o'zi tuzadi.
   // Ustun hali qo'shilmagan bo'lsa — eski xatti-harakat (har kimga alohida).
   const sharedSchedule = usesStaff && provider?.schedule_mode === "shared";
+
+  // Xodim boshqaruvi bitta bo'lim, lekin biznes turiga qarab nomi/ekrani boshqa:
+  //   bo'limli biznes (shifoxona/klinika) → /staff  (Shifokorlar)
+  //   bo'limsiz biznes (sartaroshxona…)   → /workers (Ustalar)
+  const isClinic = usesStaff && usesDepartments;
+  const showStaffScreen = usesStaff && isClinic;
+  const showWorkersScreen = usesStaff && !isClinic;
 
   const handleLogout = () => {
     Alert.alert(t("auth.logout"), "", [
@@ -119,8 +126,8 @@ export default function MoreScreen() {
           },
         ]
       : []),
-    // Shifoxona/klinika: shifokorlar — faqat kategoriya bayroqchasi yoqilganda
-    ...(usesStaff
+    // Shifoxona/klinika: shifokorlar
+    ...(showStaffScreen
       ? [
           {
             key: "staff",
@@ -140,6 +147,19 @@ export default function MoreScreen() {
       href: "/services" as Href,
       tone: "secondary",
     },
+    // Ustalar (sartaroshxona kabi bizneslar): usta qo'shish + login yaratish
+    ...(showWorkersScreen
+      ? [
+          {
+            key: "workers",
+            icon: Users,
+            title: t("pv.nav_workers"),
+            subtitle: t("pv.more_workers_sub"),
+            href: "/workers" as Href,
+            tone: "tertiary" as Tone,
+          },
+        ]
+      : []),
     // Restoran (stol rejimi): menyu — mijoz stol bron qilishda oldindan buyurtma qiladi
     ...(mode === "table" && unit === "table"
       ? [
@@ -187,9 +207,9 @@ export default function MoreScreen() {
     },
   ];
 
-  // Shifokor uchun — o'ziga tegishli to'liq panel: o'z jadvali (umumiy rejimda
-  // klinika jadvali — faqat ko'rish), o'z xizmatlari, o'z statistikasi
-  // (faqat uning bronlari), klinika profili (faqat ko'rish).
+  // Xodim uchun — o'ziga tegishli to'liq panel: o'z jadvali (umumiy rejimda
+  // biznes jadvali — faqat ko'rish), o'z xizmatlari, o'z statistikasi
+  // (faqat uning bronlari), biznes profili (faqat ko'rish).
   const staffItems: MoreItem[] = [
     {
       key: "schedule",
@@ -199,7 +219,7 @@ export default function MoreScreen() {
       href: "/schedule" as Href,
       tone: "primary",
     },
-    // Xizmatlarni shifokor o'zi qo'shadi (services.worker_id)
+    // Xizmatlarni xodim o'zi qo'shadi (services.worker_id)
     {
       key: "services",
       icon: Tag,
@@ -257,7 +277,7 @@ export default function MoreScreen() {
                 <Text style={styles.rowSub} numberOfLines={1}>
                   {user?.email}
                 </Text>
-                {/* Shifokor qaysi klinikada ishlashini ko'rib tursin */}
+                {/* Xodim qaysi biznesda ishlashini ko'rib tursin */}
                 {isStaff && clinicName ? (
                   <Text style={styles.rowClinic} numberOfLines={1}>
                     {t("stf.staff_at", { name: clinicName })}
@@ -322,7 +342,7 @@ export default function MoreScreen() {
           );
         })}
 
-        {/* Chiqish — shifokorda Sozlamalardan tashqari shu yerda ham turadi,
+        {/* Chiqish — xodimda Sozlamalardan tashqari shu yerda ham turadi,
             chunki uning menyusi qisqa va biznes bo'limlari yo'q */}
         {isStaff ? (
           <Pressable onPress={handleLogout}>
