@@ -2,12 +2,20 @@
 // Baza jadvali: provider_staff. Owner ustaga LOGIN + PAROL yaratadi (create-worker
 // Edge Function -> provider_staff). Usta shu login bilan kirib, o'z profilini
 // (ism/rasm/mutaxassislik/bio/telefon) o'zi to'ldiradi.
+//
+// Login/parol shifokorlar (staff.tsx) bilan bir xil `worker_credentials` jadvalida
+// OCHIQ saqlanadi (RLS: faqat ega o'qiydi) — shuning uchun ro'yxatda login+parol
+// doim ko'rsatiladi (parol ko'z tugmasi bilan ochiladi, nusxalanadi, yangilanadi).
+import * as Clipboard from "expo-clipboard";
+import { GlassView } from "expo-glass-effect";
 import { useRouter } from "expo-router";
 import {
   ArrowLeft,
   Check,
   Clock,
+  Copy,
   KeyRound,
+  type LucideIcon,
   Save,
   Share2,
   Trash2,
@@ -17,7 +25,18 @@ import {
   X,
 } from "lucide-react-native";
 import React, { useCallback, useEffect, useState } from "react";
-import { Pressable, Share, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  type StyleProp,
+  Text,
+  TextInput,
+  View,
+  type ViewStyle,
+} from "react-native";
+import { AnimatedLogo } from "@/components/animated-logo";
 import { BusinessGate } from "@/components/pv/business-gate";
 import { Screen } from "@/components/pv/screen";
 import { useToast } from "@/components/pv/toast";
@@ -27,14 +46,15 @@ import {
   EmptyState,
   GlassIconButton,
   GlassSurface,
+  liquidGlass,
   PageHeader,
-  SmallButton,
+  SmallButton as BaseSmallButton,
   Spinner,
   TogglePill,
 } from "@/components/pv/ui";
 import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
-import { makeThemedStyles, useColors } from "@/context/ThemeContext";
+import { makeThemedStyles, useColors, useTheme } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
 import { useBookingMode } from "@/hooks/useBookingMode";
 import { supabase } from "@/lib/supabase";
@@ -53,6 +73,15 @@ interface Staff {
   sort_order: number;
 }
 
+// worker_credentials — ustaning kirish ma'lumotlari (login+parol ochiq). worker_id =
+// provider_staff.id. RLS bo'yicha faqat biznes egasi o'qiy oladi. Shifokorlar
+// (staff.tsx) bilan bir xil jadval.
+interface WorkerCredential {
+  worker_id: string;
+  username: string;
+  password: string;
+}
+
 // Chalkash belgilarsiz (O/0, l/1) o'qsa bo'ladigan parol
 const PW_CHARS = "abcdefghjkmnpqrstuvwxyzACDEFGHJKLMNPQRSTUVWXYZ23456789";
 function genPassword(len = 8): string {
@@ -67,6 +96,84 @@ function suggestUsername(name: string): string {
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .slice(0, 20);
+}
+
+// Ustalar ekranidagi tugma — navbardek native Liquid Glass (rangsiz "toza shisha",
+// faqat matn/ikonka rangi variantga qarab). iOS 26+ da GlassView; aks holda (Android,
+// eski iOS) oddiy SmallButton fallback. API SmallButton bilan bir xil.
+function GlassButton({
+  label,
+  onPress,
+  icon: Icon,
+  variant = "primary",
+  loading,
+  disabled,
+  style,
+}: {
+  label: string;
+  onPress: () => void;
+  icon?: LucideIcon;
+  variant?: "primary" | "outline" | "error";
+  loading?: boolean;
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const styles = useStyles();
+  const colors = useColors();
+  const { scheme } = useTheme();
+  // Dastur rangidagi shisha — tint brand rangida, lekin yarim shaffof (shishaligicha).
+  const tint =
+    variant === "primary"
+      ? colors.primary
+      : variant === "error"
+        ? alpha(colors.errorContainer, 0.55)
+        : alpha(colors.primary, 0.22);
+  const fg =
+    variant === "primary" ? colors.onPrimary : variant === "error" ? colors.error : colors.primary;
+
+  if (!liquidGlass) {
+    return (
+      <BaseSmallButton
+        label={label}
+        onPress={onPress}
+        icon={Icon}
+        variant={variant}
+        loading={loading}
+        disabled={disabled}
+        style={style}
+      />
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled || loading}
+      // Diqqat: opacity 0 bo'lmasin — aks holda glass effekt chizilmaydi
+      style={({ pressed }) => [{ opacity: disabled ? 0.5 : pressed ? 0.85 : 1 }, style]}
+    >
+      <GlassView
+        glassEffectStyle="regular"
+        colorScheme={scheme}
+        isInteractive
+        tintColor={tint}
+        style={styles.glassBtn}
+      >
+        {loading ? (
+          <AnimatedLogo variant="loading" size={18} background={null} foreground={fg} />
+        ) : (
+          <>
+            {Icon ? <Icon size={14} color={fg} /> : null}
+            {label ? (
+              <Text style={[styles.glassBtnText, { color: fg }]} numberOfLines={1}>
+                {label}
+              </Text>
+            ) : null}
+          </>
+        )}
+      </GlassView>
+    </Pressable>
+  );
 }
 
 function WorkersContent() {
@@ -95,6 +202,13 @@ function WorkersContent() {
 
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
+  // Login/parol holati: worker_id → ma'lumot. credsReady=false bo'lsa (jadval yo'q
+  // yoki o'qib bo'lmadi) blok chizilmaydi.
+  const [creds, setCreds] = useState<Record<string, WorkerCredential>>({});
+  const [credsReady, setCredsReady] = useState(false);
+  const [credBusy, setCredBusy] = useState<string | null>(null); // qaysi usta yangilanmoqda
+  const [resetFor, setResetFor] = useState<string | null>(null); // parolni yangilash tasdig'i
+
   // Owner tugmasi: ustalar o'z narxini belgilaydimi (providers.staff_sets_own_price)
   const [selfPricing, setSelfPricing] = useState(false);
   useEffect(() => {
@@ -117,6 +231,25 @@ function WorkersContent() {
     }
   };
 
+  // Ustalarning login/paroli — bitta so'rov bilan (worker_credentials). Jadval yo'q
+  // yoki o'qib bo'lmasa credsReady=false bo'lib qoladi, blok chizilmaydi.
+  const loadCreds = useCallback(async () => {
+    if (!providerId) return;
+    const { data, error } = await supabase
+      .from("worker_credentials")
+      .select("worker_id, username, password")
+      .eq("provider_id", providerId);
+    if (error) {
+      setCredsReady(false);
+      setCreds({});
+      return;
+    }
+    const map: Record<string, WorkerCredential> = {};
+    for (const row of (data as WorkerCredential[]) || []) map[row.worker_id] = row;
+    setCredsReady(true);
+    setCreds(map);
+  }, [providerId]);
+
   const load = useCallback(async () => {
     if (!providerId) return;
     setLoading(true);
@@ -127,8 +260,9 @@ function WorkersContent() {
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     setStaff((data as Staff[]) || []);
+    await loadCreds();
     setLoading(false);
-  }, [providerId]);
+  }, [providerId, loadCreds]);
 
   // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
   useEffect(() => {
@@ -197,7 +331,8 @@ function WorkersContent() {
         setCreating(false);
         return;
       }
-      // Muvaffaqiyat — login/parolni ownerga ko'rsatamiz
+      // Muvaffaqiyat — login/parolni ownerga ko'rsatamiz (tepadagi karta). Ro'yxatda
+      // ham login+parol ochiq ko'rinadi (worker_credentials'dan)
       setCredentials({ username: uname, password });
       resetForm();
       await load();
@@ -216,6 +351,53 @@ function WorkersContent() {
       await Share.share({ message: msg });
     } catch {
       /* foydalanuvchi bekor qildi */
+    }
+  };
+
+  // Matnni clipboardga nusxalab, toast ko'rsatamiz
+  const copy = async (text: string, okMsg: string) => {
+    try {
+      await Clipboard.setStringAsync(text);
+      showToast(okMsg);
+    } catch {
+      showToast(t("wk.copy_failed"), "error");
+    }
+  };
+
+  // Login + parolni bitta matn qilib nusxalash
+  const copyBoth = (username: string, password: string) =>
+    copy(`${t("wk.credentials_login")}: ${username}\n${t("wk.credentials_password")}: ${password}`, t("wk.copied"));
+
+  // Mavjud ustaga YANGI parol o'rnatamiz (eski parol qayta o'qilmaydi — hash saqlanadi).
+  // Yangi parol worker_credentials'ga yoziladi va kartada ochiq ko'rsatiladi.
+  const resetPassword = async (w: Staff) => {
+    setResetFor(null);
+    setCredBusy(w.id);
+    const newPw = genPassword();
+    try {
+      const res = await supabase.functions.invoke("reset-worker-password", {
+        body: { staff_id: w.id, password: newPw },
+      });
+      if (res.error) {
+        showToast(t("wk.reset_failed"), "error");
+        return;
+      }
+      const data = res.data as { username?: string | null; cred_error?: string | null };
+      // Kredensial saqlanmagan bo'lsa — aniq xatoni ko'rsatamiz (diagnostika)
+      if (data?.cred_error) {
+        showToast(`DB: ${data.cred_error}`, "error");
+        return;
+      }
+      const uname = data?.username || creds[w.id]?.username || "";
+      // Darhol ochiq ko'rsatamiz, so'ng ro'yxatni yangilaymiz
+      setCreds((p) => ({ ...p, [w.id]: { worker_id: w.id, username: uname, password: newPw } }));
+      setCredsReady(true);
+      showToast(t("wk.password_reset_ok"));
+      await loadCreds();
+    } catch {
+      showToast(t("wk.reset_failed"), "error");
+    } finally {
+      setCredBusy(null);
     }
   };
 
@@ -318,35 +500,46 @@ function WorkersContent() {
           </View>
           <Text style={styles.credDesc}>{t("wk.created_desc")}</Text>
           <View style={styles.credRow}>
-            <Text style={styles.credLabel}>{t("wk.credentials_login")}</Text>
-            <Text style={styles.credValue} selectable>
-              {credentials.username}
-            </Text>
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={styles.credLabel}>{t("wk.credentials_login")}</Text>
+              <Text style={styles.credValue} selectable numberOfLines={1}>
+                {credentials.username}
+              </Text>
+            </View>
+            <GlassIconButton onPress={() => copy(credentials.username, t("wk.copied_login"))}>
+              <Copy size={16} color={colors.primary} />
+            </GlassIconButton>
           </View>
           <View style={styles.credRow}>
-            <Text style={styles.credLabel}>{t("wk.credentials_password")}</Text>
-            <Text style={styles.credValue} selectable>
-              {credentials.password}
-            </Text>
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <Text style={styles.credLabel}>{t("wk.credentials_password")}</Text>
+              <Text style={styles.credValue} selectable numberOfLines={1}>
+                {credentials.password}
+              </Text>
+            </View>
+            <GlassIconButton onPress={() => copy(credentials.password, t("wk.copied_password"))}>
+              <Copy size={16} color={colors.primary} />
+            </GlassIconButton>
           </View>
           <View style={{ flexDirection: "row", gap: 12 }}>
-            <SmallButton
-              label={t("wk.share")}
-              icon={Share2}
-              onPress={shareCredentials}
+            <GlassButton
+              label={t("wk.copy_both")}
+              icon={Copy}
+              onPress={() => copyBoth(credentials.username, credentials.password)}
               style={{ flex: 1 }}
             />
-            <SmallButton
-              label={t("wk.done")}
-              icon={Check}
-              variant="outline"
-              onPress={() => setCredentials(null)}
-            />
+            <GlassButton label={t("wk.share")} icon={Share2} variant="outline" onPress={shareCredentials} />
           </View>
+          <GlassButton
+            label={t("wk.done")}
+            icon={Check}
+            variant="outline"
+            onPress={() => setCredentials(null)}
+          />
         </GlassSurface>
       )}
 
-      {!formOpen && <SmallButton label={t("wk.add")} icon={UserPlus} onPress={openAdd} />}
+      {!formOpen && <GlassButton label={t("wk.add")} icon={UserPlus} onPress={openAdd} />}
 
       {/* Qo'shish formasi */}
       {formOpen && (
@@ -403,14 +596,14 @@ function WorkersContent() {
           </View>
 
           <View style={{ flexDirection: "row", gap: 12 }}>
-            <SmallButton
+            <GlassButton
               label={t("wk.create")}
               icon={Save}
               onPress={create}
               loading={creating}
               style={{ flex: 1 }}
             />
-            <SmallButton label={t("common.cancel")} icon={X} variant="outline" onPress={resetForm} />
+            <GlassButton label={t("common.cancel")} icon={X} variant="outline" onPress={resetForm} />
           </View>
         </GlassSurface>
       )}
@@ -444,9 +637,9 @@ function WorkersContent() {
                   ) : null}
                 </View>
                 {deleteId === w.id ? (
-                  <SmallButton label={t("wk.delete_q")} variant="error" onPress={() => remove(w.id)} />
+                  <GlassButton label={t("wk.delete_q")} variant="error" onPress={() => remove(w.id)} />
                 ) : (
-                  <SmallButton
+                  <GlassButton
                     label=""
                     icon={Trash2}
                     variant="error"
@@ -467,6 +660,71 @@ function WorkersContent() {
                 </View>
                 <TogglePill value={w.schedule_self_managed} onToggle={() => toggleSelfSchedule(w)} />
               </View>
+
+              {/* Kirish ma'lumotlari — login + parol (ochiq/yashirin), nusxa, yangilash */}
+              {credsReady ? (
+                <View style={styles.wcBlock}>
+                  {creds[w.id] ? (
+                    <>
+                      <View style={styles.wcRow}>
+                        <Text style={styles.wcLabel}>{t("wk.credentials_login")}</Text>
+                        <Text style={styles.wcValue} numberOfLines={1} selectable>
+                          {creds[w.id].username}
+                        </Text>
+                        <Pressable
+                          onPress={() => copy(creds[w.id].username, t("wk.copied_login"))}
+                          hitSlop={8}
+                          accessibilityLabel={t("wk.copied_login")}
+                        >
+                          <Copy size={15} color={colors.onSurfaceVariant} />
+                        </Pressable>
+                      </View>
+                      <View style={styles.wcRow}>
+                        <Text style={styles.wcLabel}>{t("wk.credentials_password")}</Text>
+                        <Text style={styles.wcValue} numberOfLines={1} selectable>
+                          {creds[w.id].password}
+                        </Text>
+                        <Pressable
+                          onPress={() => copy(creds[w.id].password, t("wk.copied_password"))}
+                          hitSlop={8}
+                          accessibilityLabel={t("wk.copied_password")}
+                        >
+                          <Copy size={15} color={colors.onSurfaceVariant} />
+                        </Pressable>
+                      </View>
+                      <View style={styles.wcActions}>
+                        <GlassButton
+                          label={t("wk.copy_both")}
+                          icon={Copy}
+                          variant="outline"
+                          onPress={() => copyBoth(creds[w.id].username, creds[w.id].password)}
+                          style={{ flex: 1 }}
+                        />
+                        <GlassButton
+                          label={resetFor === w.id ? t("wk.reset_confirm") : t("wk.reset_password")}
+                          icon={KeyRound}
+                          variant={resetFor === w.id ? "error" : "outline"}
+                          loading={credBusy === w.id}
+                          onPress={() =>
+                            resetFor === w.id ? resetPassword(w) : setResetFor(w.id)
+                          }
+                        />
+                      </View>
+                    </>
+                  ) : (
+                    // Eski usta — kredensial saqlanmagan. Yangi parol yaratamiz.
+                    <>
+                      <Text style={styles.wcHint}>{t("wk.no_cred_hint")}</Text>
+                      <GlassButton
+                        label={t("wk.reveal_password")}
+                        icon={KeyRound}
+                        onPress={() => resetPassword(w)}
+                        loading={credBusy === w.id}
+                      />
+                    </>
+                  )}
+                </View>
+              ) : null}
             </Card>
           );
         })
@@ -486,6 +744,19 @@ export default function WorkersScreen() {
 const useStyles = makeThemedStyles((colors) =>
   StyleSheet.create({
     backRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+
+    // Ustalar ekrani tugmasi — native glass (GlassButton)
+    glassBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 999,
+      overflow: "hidden",
+    },
+    glassBtnText: { fontSize: 12, fontWeight: "600" },
 
     credCard: { borderRadius: radius.xl, padding: 20, gap: 12, overflow: "hidden" },
     credCardFallback: {
@@ -569,6 +840,28 @@ const useStyles = makeThemedStyles((colors) =>
     workerName: { fontSize: 16, fontWeight: "700", color: colors.onSurface },
     workerSpec: { fontSize: 13, color: colors.onSurfaceVariant, marginTop: 2 },
     workerPending: { fontSize: 12, fontWeight: "600", color: colors.error, marginTop: 2 },
+
+    // ── Login va parol bloki (worker_credentials) ──
+    wcBlock: {
+      gap: 10,
+      marginTop: 14,
+      paddingTop: 14,
+      borderTopWidth: 1,
+      borderTopColor: colors.outlineVariant,
+    },
+    wcRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+    wcLabel: { fontSize: 11, fontWeight: "600", color: colors.onSurfaceVariant, width: 58 },
+    wcValue: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: "600",
+      letterSpacing: 0.3,
+      color: colors.onSurface,
+      // Login/parol belgilarini adashtirmaslik uchun monokenglik shrift
+      fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }),
+    },
+    wcActions: { flexDirection: "row", gap: 10, marginTop: 4 },
+    wcHint: { fontSize: 12, color: colors.onSurfaceVariant, lineHeight: 17 },
 
     toggleRow: {
       flexDirection: "row",
