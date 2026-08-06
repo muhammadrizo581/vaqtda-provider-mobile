@@ -12,24 +12,37 @@ import {
   Clock,
   Coffee,
   Layers,
+  Lock,
   Monitor,
   Plus,
   Save,
+  Stethoscope,
   Tag,
   Timer,
   Trash2,
+  Users,
 } from "lucide-react-native";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { BusinessGate } from "@/components/pv/business-gate";
 import { Screen } from "@/components/pv/screen";
 import { TimeField } from "@/components/pv/time-field";
 import { useToast } from "@/components/pv/toast";
-import { Card, GlassIconButton, GlassSurface, SelectPill, SmallButton, Spinner, TogglePill } from "@/components/pv/ui";
+import {
+  Card,
+  EmptyState,
+  GlassIconButton,
+  GlassSurface,
+  SelectPill,
+  SmallButton,
+  Spinner,
+  TogglePill,
+} from "@/components/pv/ui";
 import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
+import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { useBookingMode } from "@/hooks/useBookingMode";
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
@@ -105,9 +118,9 @@ function ScheduleContent() {
   const colors = useColors();
   const styles = useStyles();
   const { t } = useLanguage();
-  const { provider } = useProvider();
+  const { provider, reload: reloadProvider } = useProvider();
   const { showToast } = useToast();
-  const { mode, unit, loading: modeLoading } = useBookingMode();
+  const { mode, unit, usesStaff, loading: modeLoading } = useBookingMode();
   // daily (dacha/villa): kun faqat ochiq/yopiq — vaqt oralig'i tahrirlanmaydi, xizmat ixtiyoriy
   const daily = mode === "daily";
   // table (restoran, kompyuter klub): xizmat yo'q — kamida bitta faol stol/kompyuter kerak
@@ -115,6 +128,50 @@ function ScheduleContent() {
   const pcUnit = unit === "computer";
   const router = useRouter();
   const providerId = provider?.id || null;
+
+  // ── Shifokorlar va jadval rejimi (klinika) ──────────────────────────────────
+  // Klinikada rahbar (ega) ikkita rejimdan birini tanlaydi:
+  //   "shared"     — butun biznesga BITTA jadval (timetable_slots.staff_id IS NULL).
+  //                  Uni faqat rahbar tuzadi, shifokorlar faqat ko'radi.
+  //   "individual" — har bir shifokor O'Z jadvalini o'zi tuzadi (staff_id = uniki).
+  //                  Rahbar har bir shifokorning jadvalini ko'ra oladi, lekin
+  //                  tahrirlay olmaydi.
+  //
+  // Xodim (shifokor) o'zi kirganda tanlov YO'Q: ekran yo umumiy jadvalga (faqat
+  // ko'rish), yo o'z jadvaliga qulflanadi (RLS ham shunga mos ishlaydi).
+  const { isStaff, staffId: myStaffId } = useStaffRoleContext();
+  const [staffList, setStaffList] = useState<{ id: string; full_name: string }[]>([]);
+  // Ro'yxat serverdan kelib bo'ldimi — "shifokor yo'q" holatini erta ko'rsatmaslik uchun
+  const [staffLoaded, setStaffLoaded] = useState(false);
+  const [pickedStaffId, setPickedStaffId] = useState<string | null>(null);
+  const [modeSaving, setModeSaving] = useState(false);
+
+  // providers.schedule_mode ustuni hali qo'shilmagan bo'lsa qiymat undefined
+  // bo'ladi — bunda eski xatti-harakat (har kimga alohida) saqlanib qoladi.
+  const sharedSchedule = usesStaff && provider?.schedule_mode === "shared";
+  // Klinika rahbari (ega) / klinika shifokori
+  const clinicOwner = usesStaff && !isStaff;
+  const clinicStaff = usesStaff && isStaff;
+  // Faqat ko'rish: rahbar boshqaning jadvalini, shifokor esa umumiy jadvalni
+  // tahrirlay olmaydi
+  const readOnly = (clinicOwner && !sharedSchedule) || (clinicStaff && sharedSchedule);
+  // Shifokor tanlash faqat "har kimga alohida" rejimida ma'noga ega — bu
+  // rejimda rahbar doktor tanlamaguncha jadval yuklanmaydi ham
+  const needsStaffPick = clinicOwner && !sharedSchedule;
+
+  // Jadval qatorlari kim uchun o'qiladi/saqlanadi:
+  //   klinika + umumiy rejim  → butun biznes (staff_id IS NULL)
+  //   klinika + alohida rejim → tanlangan (rahbar) yoki o'z (shifokor) doktori
+  //   klinika emas + xodim    → o'zi (eski xatti-harakat)
+  const staffId = sharedSchedule ? null : isStaff ? myStaffId : usesStaff ? pickedStaffId : null;
+  // Jadval shifokor kesimida saqlanadimi: klinika rejimi yoki xodim kirgan
+  const staffScoped = usesStaff || isStaff;
+  // Klinikada hali bitta ham shifokor yo'q — tahrirlash o'rniga bo'sh holat
+  const noStaffYet = needsStaffPick && staffLoaded && staffList.length === 0;
+  // timetable_config butun biznesga umumiy. Bitta shifokorning (masalan, 1
+  // haftalik) jadvalini saqlash boshqa shifokorlarning uzoqroq jadvalini
+  // "kesib" qo'ymasligi uchun schedule_days hech qachon kamaytirilmaydi.
+  const savedScheduleDays = useRef(0);
 
   const [schedule, setSchedule] = useState<ScheduleMap>({});
   const [config, setConfig] = useState<TimetableConfig>(DEFAULT_CONFIG);
@@ -169,21 +226,34 @@ function ScheduleContent() {
 
   // ── Load data ──────────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
-    if (!providerId) return;
+    // Rejim aniqlanmaguncha kutamiz — aks holda klinika ham bir zumda
+    // umumiy jadval sifatida yuklanib qolardi
+    if (!providerId || modeLoading) return;
+    // "Har kimga alohida" rejimida shifokor tanlanmagan bo'lsa hech narsa
+    // yuklanmaydi (ro'yxat kelgach spinner o'chadi)
+    if (needsStaffPick && !staffId) {
+      setSchedule({});
+      if (staffLoaded) setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
 
     try {
+      // Xodimda timetable_config ga ruxsat yo'q (u butun biznesga tegishli) —
+      // sozlama o'qilmasa standart qiymatlar qoladi
       const { data: cfg } = await supabase
         .from("timetable_config")
         .select("*")
         .eq("provider_id", providerId)
         .maybeSingle();
-      if (cfg)
+      if (cfg) {
         setConfig({
           bufferMinutes: cfg.buffer_minutes || 0,
           slotMinutes: cfg.slot_duration_minutes || 60,
         });
+        savedScheduleDays.current = Number(cfg.schedule_days) || 0;
+      }
 
       const { count: svcCount } = await supabase
         .from("services")
@@ -200,18 +270,26 @@ function ScheduleContent() {
       setActiveTables(tblCount || 0);
 
       const today = tashkentClock.now().dateStr;
-      const { data: slotsData } = await supabase
+      // Klinika rejimida jadval shifokor kesimida saqlanadi; boshqa bizneslarda
+      // filtr umuman qo'llanmaydi — mavjud xatti-harakat o'zgarmaydi
+      let slotsQ = supabase
         .from("timetable_slots")
         .select("*")
         .eq("provider_id", providerId)
         .not("slot_date", "is", null)
         .gte("slot_date", today);
-      const { data: breaksData } = await supabase
+      let breaksQ = supabase
         .from("timetable_breaks")
         .select("*")
         .eq("provider_id", providerId)
         .not("slot_date", "is", null)
         .gte("slot_date", today);
+      if (staffScoped) {
+        slotsQ = staffId ? slotsQ.eq("staff_id", staffId) : slotsQ.is("staff_id", null);
+        breaksQ = staffId ? breaksQ.eq("staff_id", staffId) : breaksQ.is("staff_id", null);
+      }
+      const { data: slotsData } = await slotsQ;
+      const { data: breaksData } = await breaksQ;
 
       const map: ScheduleMap = {};
       (slotsData || []).forEach((s: any) => {
@@ -239,13 +317,67 @@ function ScheduleContent() {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [providerId]);
+  }, [providerId, modeLoading, needsStaffPick, staffLoaded, staffScoped, staffId]);
+
+  // Shifokorlar ro'yxati — faqat klinika rejimida va faqat EGA uchun
+  // (xodimga tanlov ko'rsatilmaydi, shuning uchun ro'yxat ham kerak emas).
+  // "Har kimga alohida" rejimida ro'yxat kelgach birinchi shifokor avtomatik
+  // tanlanadi — jadval doim aniq bir doktorniki bo'ladi.
+  useEffect(() => {
+    if (isStaff || !usesStaff || !providerId) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const { data } = await supabase
+        .from("provider_staff")
+        .select("id, full_name")
+        .eq("provider_id", providerId)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true });
+      if (cancelled) return;
+      const list = (data as { id: string; full_name: string }[]) || [];
+      setStaffList(list);
+      setPickedStaffId((prev) => prev ?? list[0]?.id ?? null);
+      setStaffLoaded(true);
+    }, 0);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [isStaff, usesStaff, providerId]);
 
   // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
   useEffect(() => {
     const t = setTimeout(loadData, 0);
     return () => clearTimeout(t);
   }, [loadData]);
+
+  // ── Jadval rejimini almashtirish (faqat klinika rahbari) ────────────────────
+  // providers.schedule_mode yoziladi; ustun hali qo'shilmagan bo'lsa xato
+  // yutiladi va ekran o'z holicha qoladi.
+  const changeScheduleMode = async (next: "shared" | "individual") => {
+    if (!providerId || modeSaving) return;
+    if ((provider?.schedule_mode ?? "individual") === next) return;
+    setModeSaving(true);
+    const { error: modeErr } = await supabase
+      .from("providers")
+      .update({ schedule_mode: next })
+      .eq("id", providerId);
+    if (modeErr) {
+      // Ustun bazada yo'q (migratsiya qilinmagan) — buni aniq aytamiz;
+      // boshqa xatolarda esa bazaning haqiqiy xabarini ko'rsatamiz, aks holda
+      // sabab noma'lum bo'lib qoladi
+      const code = `${modeErr.code || ""}`;
+      const msg = `${modeErr.message || ""}`;
+      const missingColumn =
+        code === "42703" || code === "PGRST204" || msg.includes("schedule_mode");
+      showToast(missingColumn ? t("sch.mode_unavailable") : msg || t("sch.mode_failed"), "error");
+    } else {
+      // Provider konteksti yangilangach jadval avtomatik qayta yuklanadi
+      await reloadProvider();
+      showToast(t("sch.mode_saved"));
+    }
+    setModeSaving(false);
+  };
 
   // ── Validatsiya ─────────────────────────────────────────────────────────────
   const validate = (): string | null => {
@@ -275,9 +407,12 @@ function ScheduleContent() {
       }
     }
     // Xizmat talabi rejimga bog'liq: slots — majburiy, daily — ixtiyoriy,
-    // table — xizmat o'rniga kamida bitta faol stol/kompyuter bo'lishi kerak
-    if (!modeLoading) {
-      if (mode === "slots" && activeServices === 0) {
+    // table — xizmat o'rniga kamida bitta faol stol/kompyuter bo'lishi kerak.
+    // Xodimdan buni talab qilmaymiz — u xizmat qo'shishga majbur emas.
+    // Klinikada esa xizmatlarni har bir shifokor o'zi qo'shadi: rahbar buni bu
+    // yerdan tuzata olmagani uchun undan ham talab qilinmaydi.
+    if (!modeLoading && !isStaff) {
+      if (mode === "slots" && !usesStaff && activeServices === 0) {
         return t("tt.val_need_service");
       }
       if (tableMode && activeTables === 0) {
@@ -290,6 +425,10 @@ function ScheduleContent() {
   // ── Save ───────────────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!providerId) return;
+    // Faqat ko'rish holatida saqlash umuman yo'q (tugma ham chizilmaydi)
+    if (readOnly) return;
+    // "Har kimga alohida" rejimida jadval doim aniq shifokorga yoziladi
+    if (needsStaffPick && !staffId) return;
     setError(null);
 
     const problem = validate();
@@ -310,9 +449,12 @@ function ScheduleContent() {
         if (!day?.enabled || day.slots.length === 0) continue;
         maxOffset = Math.max(maxOffset, dayDiff(today, date));
         const dow = weekdayKeyOf(date);
+        // Klinika rejimida yozuv shifokorga tegishli bo'ladi (null = umumiy jadval)
+        const staffCol = staffScoped ? { staff_id: staffId } : {};
         day.slots.forEach((s) =>
           slotsToInsert.push({
             provider_id: providerId,
+            ...staffCol,
             slot_date: date,
             day_of_week: dow,
             start_time: s.start,
@@ -323,6 +465,7 @@ function ScheduleContent() {
         day.breaks.forEach((b) =>
           breaksToInsert.push({
             provider_id: providerId,
+            ...staffCol,
             slot_date: date,
             day_of_week: dow,
             start_time: b.start,
@@ -332,52 +475,68 @@ function ScheduleContent() {
         );
       }
 
+      // Klinika rejimida aniq shifokor saqlanayotgan bo'lsa — umumiy
+      // schedule_days kamaymaydi (boshqa shifokorlarning uzoqroq jadvali bor)
+      const days = Math.max(1, maxOffset + 1);
       const configPayload: Record<string, unknown> = {
         buffer_minutes: config.bufferMinutes,
         slot_duration_minutes: Math.max(15, config.slotMinutes),
-        schedule_days: Math.max(1, maxOffset + 1),
+        schedule_days: staffScoped ? Math.max(days, savedScheduleDays.current) : days,
         updated_at: new Date().toISOString(),
       };
 
-      const { data: existingConfig } = await supabase
-        .from("timetable_config")
-        .select("id")
-        .eq("provider_id", providerId)
-        .maybeSingle();
-      const upsertConfig = async (payload: Record<string, unknown>) => {
-        if (existingConfig) {
-          return supabase.from("timetable_config").update(payload).eq("provider_id", providerId);
+      // timetable_config — BUTUN biznesga umumiy sozlama. Uni faqat ega
+      // yozadi; xodimda unga ruxsat yo'q (yozishga urinsa xato bo'lardi).
+      if (!isStaff) {
+        const { data: existingConfig } = await supabase
+          .from("timetable_config")
+          .select("id")
+          .eq("provider_id", providerId)
+          .maybeSingle();
+        const upsertConfig = async (payload: Record<string, unknown>) => {
+          if (existingConfig) {
+            return supabase.from("timetable_config").update(payload).eq("provider_id", providerId);
+          }
+          // duration_type/... — legacy ustunlar, insert'da neytral qiymat
+          return supabase.from("timetable_config").insert({
+            provider_id: providerId,
+            ...payload,
+            duration_type: "fixed",
+            fixed_durations: [],
+            flexible_min: 10,
+          });
+        };
+
+        let { error: cfgErr } = await upsertConfig(configPayload);
+        if (cfgErr && `${cfgErr.message}`.includes("slot_duration_minutes")) {
+          // DBda ustun hali qo'shilmagan bo'lsa, jadvalni bu maydonsiz saqlayveramiz
+          const { slot_duration_minutes: _omit, ...rest } = configPayload;
+          void _omit;
+          ({ error: cfgErr } = await upsertConfig(rest));
         }
-        // duration_type/... — legacy ustunlar, insert'da neytral qiymat
-        return supabase.from("timetable_config").insert({
-          provider_id: providerId,
-          ...payload,
-          duration_type: "fixed",
-          fixed_durations: [],
-          flexible_min: 10,
-        });
-      };
-
-      let { error: cfgErr } = await upsertConfig(configPayload);
-      if (cfgErr && `${cfgErr.message}`.includes("slot_duration_minutes")) {
-        // DBda ustun hali qo'shilmagan bo'lsa, jadvalni bu maydonsiz saqlayveramiz
-        const { slot_duration_minutes: _omit, ...rest } = configPayload;
-        void _omit;
-        ({ error: cfgErr } = await upsertConfig(rest));
+        if (cfgErr) throw cfgErr;
       }
-      if (cfgErr) throw cfgErr;
 
-      // Kelajakdagi yozuvlarni o'chirib, qaytadan yozamiz (o'tganlarga tegilmaydi)
-      await supabase
+      // Kelajakdagi yozuvlarni o'chirib, qaytadan yozamiz (o'tganlarga tegilmaydi).
+      // DIQQAT: klinika rejimida o'chirish AYNAN shu shifokor (yoki umumiy)
+      // jadvaliga cheklanadi — aks holda bir doktorni saqlash boshqalarining
+      // jadvalini ham o'chirib yuborardi.
+      let delSlots = supabase
         .from("timetable_slots")
         .delete()
         .eq("provider_id", providerId)
         .or(`slot_date.gte.${today},slot_date.is.null`);
-      await supabase
+      let delBreaks = supabase
         .from("timetable_breaks")
         .delete()
         .eq("provider_id", providerId)
         .or(`slot_date.gte.${today},slot_date.is.null`);
+      if (staffScoped) {
+        delSlots = staffId ? delSlots.eq("staff_id", staffId) : delSlots.is("staff_id", null);
+        delBreaks = staffId ? delBreaks.eq("staff_id", staffId) : delBreaks.is("staff_id", null);
+      }
+      await delSlots;
+      await delBreaks;
 
       if (slotsToInsert.length > 0) {
         const { error: slotErr } = await supabase.from("timetable_slots").insert(slotsToInsert);
@@ -503,6 +662,68 @@ function ScheduleContent() {
   );
 
   // ── Render ─────────────────────────────────────────────────────────────────
+  // Jadval rejimi — faqat klinika rahbari uchun. Butun biznesga bitta jadvalmi
+  // yoki har bir shifokor o'ziniki — shu yerda tanlanadi. "Shifokor yo'q"
+  // holatida ham ko'rsatiladi, aks holda rahbar rejimni qaytara olmay qolardi.
+  const modeSwitch = clinicOwner ? (
+    <Card style={styles.modeCard}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <Users size={16} color={colors.primary} />
+        <Text style={styles.cardTitle}>{t("sch.mode_title")}</Text>
+      </View>
+      <Text style={styles.cardDesc}>{t("sch.mode_desc")}</Text>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+        <SelectPill
+          label={t("sch.mode_shared")}
+          active={sharedSchedule}
+          onPress={() => changeScheduleMode("shared")}
+          style={{ flexGrow: 1 }}
+        />
+        <SelectPill
+          label={t("sch.mode_individual")}
+          active={!sharedSchedule}
+          onPress={() => changeScheduleMode("individual")}
+          style={{ flexGrow: 1 }}
+        />
+      </View>
+      <Text style={styles.modeHint}>
+        {sharedSchedule ? t("sch.mode_shared_hint") : t("sch.mode_individual_hint")}
+      </Text>
+    </Card>
+  ) : null;
+
+  // Klinikada shifokor yo'q — tahrirlanadigan umumiy jadval o'rniga bo'sh holat
+  if (noStaffYet) {
+    return (
+      <Screen>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <GlassIconButton onPress={() => router.back()}>
+            <ArrowLeft size={18} color={colors.onSurfaceVariant} />
+          </GlassIconButton>
+          <CalendarDays size={24} color={colors.primary} />
+          <Text style={styles.title}>{t("pv.schedule_title")}</Text>
+        </View>
+        {modeSwitch}
+        <Card style={{ paddingBottom: 24 }}>
+          <EmptyState
+            icon={Stethoscope}
+            title={t("stf.need_staff")}
+            desc={t("stf.need_staff_desc")}
+          />
+          <View style={{ alignItems: "center" }}>
+            {/* replace — shifokor qo'shilgach jadval ekrani yangidan ochiladi
+                (aks holda eski "bo'sh" holat stack'da qolib ketardi) */}
+            <SmallButton
+              label={t("stf.add")}
+              icon={Plus}
+              onPress={() => router.replace("/staff")}
+            />
+          </View>
+        </Card>
+      </Screen>
+    );
+  }
+
   if (loading) {
     return (
       <Screen scroll={false}>
@@ -572,13 +793,82 @@ function ScheduleContent() {
         </View>
       </View>
 
-      {/* Saqlash tugmasi */}
-      <SmallButton
-        label={saving ? t("common.saving") : saved ? t("tt.saved") : t("common.save")}
-        icon={saved ? CheckCircle2 : Save}
-        onPress={handleSave}
-        loading={saving}
-      />
+      {/* Jadval rejimi (klinika rahbari) */}
+      {modeSwitch}
+
+      {/* Shifokor tanlash — faqat "har kimga alohida" rejimida: jadval har bir
+          doktor uchun alohida bo'ladi va rahbar uni faqat ko'radi.
+          Xodim o'zi kirganda tanlov yo'q — u faqat bitta jadvalni ko'radi. */}
+      {needsStaffPick && staffList.length > 0 && (
+        <View style={{ gap: 8 }}>
+          <Text style={styles.staffPickerLabel}>{t("stf.whose_schedule")}</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ gap: 8, paddingRight: 4 }}
+          >
+            {staffList.map((s) => {
+              const active = staffId === s.id;
+              return (
+                <Pressable key={s.id} onPress={() => setPickedStaffId(s.id)}>
+                  <GlassSurface
+                    style={styles.staffChip}
+                    fallbackStyle={[
+                      styles.chipFallback,
+                      active && {
+                        backgroundColor: alpha(colors.primaryContainer, 0.22),
+                        borderColor: alpha(colors.primaryContainer, 0.45),
+                      },
+                    ]}
+                    tintColor={active ? alpha(colors.primaryContainer, 0.35) : undefined}
+                  >
+                    <Text
+                      style={[
+                        styles.staffChipText,
+                        { color: active ? colors.primary : colors.onSurfaceVariant },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {s.full_name}
+                    </Text>
+                  </GlassSurface>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
+
+      {/* Xodim uchun tanlov o'rniga oddiy sarlavha: umumiy rejimda bu klinika
+          jadvali, alohida rejimda esa uning shaxsiy jadvali */}
+      {isStaff ? (
+        <Text style={styles.staffPickerLabel}>
+          {sharedSchedule ? t("sch.business_title") : t("stf.my_schedule")}
+        </Text>
+      ) : null}
+
+      {/* Faqat ko'rish izohi — nega tahrirlash tugmalari yo'qligi tushunarli bo'lsin */}
+      {readOnly ? (
+        <GlassSurface style={styles.noteBox} fallbackStyle={styles.noteBoxFallback}>
+          <Lock size={14} color={colors.onSurfaceVariant} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.noteTitle}>{t("sch.readonly")}</Text>
+            <Text style={styles.noteText}>
+              {clinicOwner ? t("sch.owner_readonly") : t("sch.staff_readonly")}
+            </Text>
+          </View>
+        </GlassSurface>
+      ) : null}
+
+      {/* Saqlash tugmasi — faqat tahrirlash mumkin bo'lganda */}
+      {!readOnly && (
+        <SmallButton
+          label={saving ? t("common.saving") : saved ? t("tt.saved") : t("common.save")}
+          icon={saved ? CheckCircle2 : Save}
+          onPress={handleSave}
+          loading={saving}
+        />
+      )}
 
       {/* Error */}
       {error ? (
@@ -620,7 +910,9 @@ function ScheduleContent() {
       <Card>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>{t("tt.tab_schedule")}</Text>
-          <Text style={styles.cardDesc}>{t("tt.card_desc")}</Text>
+          <Text style={styles.cardDesc}>
+            {readOnly ? t("sch.card_desc_readonly") : t("tt.card_desc")}
+          </Text>
         </View>
 
         {weekGroups.map((group) => (
@@ -656,7 +948,14 @@ function ScheduleContent() {
                     onPress={() => !daily && setExpandedDate(isExpanded ? null : date)}
                   >
                     <View style={styles.dayLeft}>
-                      <TogglePill value={day.enabled} onToggle={() => toggleDay(date)} />
+                      {readOnly ? (
+                        // Faqat ko'rish: tugma xira va bosilmaydi
+                        <View pointerEvents="none" style={{ opacity: 0.5 }}>
+                          <TogglePill value={day.enabled} onToggle={() => {}} />
+                        </View>
+                      ) : (
+                        <TogglePill value={day.enabled} onToggle={() => toggleDay(date)} />
+                      )}
                       <View style={{ flex: 1, minWidth: 0 }}>
                         <View style={styles.dayTitleRow}>
                           <Text
@@ -698,8 +997,48 @@ function ScheduleContent() {
                     )}
                   </Pressable>
 
+                  {/* Kengaytirilgan — faqat ko'rish: vaqtlar xira matn bo'lib
+                      chiziladi, hech qanday tahrirlash tugmasi yo'q */}
+                  {!daily && isExpanded && day.enabled && readOnly && (
+                    <View style={styles.expanded}>
+                      <View>
+                        <Text style={styles.sectionLabel}>{t("tt.work_time")}</Text>
+                        {day.slots.map((slot) => (
+                          <View key={slot.id} style={styles.roRow}>
+                            <Clock size={13} color={colors.onSurfaceVariant} />
+                            <Text style={styles.roTime}>
+                              {slot.start} — {slot.end}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+
+                      {day.breaks.length > 0 && (
+                        <View>
+                          <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 8 }}>
+                            <Coffee size={12} color={colors.onSurfaceVariant} />
+                            <Text style={[styles.sectionLabel, { marginBottom: 0 }]}>
+                              {t("tt.breaks")}
+                            </Text>
+                          </View>
+                          {day.breaks.map((br) => (
+                            <View key={br.id} style={styles.roRow}>
+                              <Coffee size={13} color={colors.onSurfaceVariant} />
+                              <Text style={styles.roLabel} numberOfLines={1}>
+                                {br.label || t("tt.lunch")}
+                              </Text>
+                              <Text style={styles.roTime}>
+                                {br.start} — {br.end}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  )}
+
                   {/* Kengaytirilgan — yoqilgan (kunlik rejimda tahrirlash yo'q) */}
-                  {!daily && isExpanded && day.enabled && (
+                  {!daily && isExpanded && day.enabled && !readOnly && (
                     <View style={styles.expanded}>
                       {/* Nusxa olish */}
                       <View>
@@ -843,7 +1182,9 @@ function ScheduleContent() {
                   {/* Kengaytirilgan — o'chirilgan */}
                   {isExpanded && !day.enabled && (
                     <View style={{ paddingHorizontal: 24, paddingBottom: 20 }}>
-                      <Text style={styles.dayOffText}>{t("tt.day_off")}</Text>
+                      <Text style={styles.dayOffText}>
+                        {readOnly ? t("tt.not_visible") : t("tt.day_off")}
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -852,24 +1193,28 @@ function ScheduleContent() {
           </View>
         ))}
 
-        {/* Keyingi hafta qo'shish */}
-        <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.outlineVariant }}>
-          {weeksAhead < MAX_WEEKS ? (
-            <Pressable
-              style={styles.addDashed}
-              onPress={() => setWeeksAhead((w) => Math.min(MAX_WEEKS, w + 1))}
-            >
-              <CalendarPlus size={14} color={colors.primary} />
-              <Text style={styles.addDashedText}>{t("tt.add_week")}</Text>
-            </Pressable>
-          ) : (
-            <Text style={styles.maxWeeksText}>{t("tt.max_weeks", { n: MAX_WEEKS })}</Text>
-          )}
-        </View>
+        {/* Keyingi hafta qo'shish — faqat tahrirlash rejimida */}
+        {!readOnly && (
+          <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.outlineVariant }}>
+            {weeksAhead < MAX_WEEKS ? (
+              <Pressable
+                style={styles.addDashed}
+                onPress={() => setWeeksAhead((w) => Math.min(MAX_WEEKS, w + 1))}
+              >
+                <CalendarPlus size={14} color={colors.primary} />
+                <Text style={styles.addDashedText}>{t("tt.add_week")}</Text>
+              </Pressable>
+            ) : (
+              <Text style={styles.maxWeeksText}>{t("tt.max_weeks", { n: MAX_WEEKS })}</Text>
+            )}
+          </View>
+        )}
       </Card>
 
-      {/* Bron davomiyligi — faqat table rejimida (xizmat yo'q, davomiylik shu yerdan olinadi) */}
-      {tableMode && (
+      {/* Bron davomiyligi — faqat table rejimida (xizmat yo'q, davomiylik shu
+          yerdan olinadi). Bu butun biznes sozlamasi — xodimga ko'rsatilmaydi.
+          Faqat ko'rish holatida ham yashiriladi: uni saqlaydigan tugma yo'q. */}
+      {tableMode && !isStaff && !readOnly && (
         <Card style={{ padding: 20 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             <Timer size={16} color={colors.primary} />
@@ -901,27 +1246,30 @@ function ScheduleContent() {
         </Card>
       )}
 
-      {/* Oraliq vaqt (buffer) */}
-      <Card style={{ padding: 20 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <Layers size={16} color={colors.primary} />
-          <Text style={styles.cardTitle}>{t("tt.buffer_title")}</Text>
-        </View>
-        <Text style={[styles.cardDesc, { marginTop: 2, marginBottom: 16 }]}>
-          {t("tt.buffer_desc")}
-        </Text>
-        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-          {BUFFER_OPTIONS.map((v) => (
-            <SelectPill
-              key={v}
-              label={v === 0 ? t("tt.buffer_none") : `${v} ${t("common.min")}`}
-              active={config.bufferMinutes === v}
-              onPress={() => setConfig((c) => ({ ...c, bufferMinutes: v }))}
-              style={{ flexGrow: 1 }}
-            />
-          ))}
-        </View>
-      </Card>
+      {/* Oraliq vaqt (buffer) — biznes sozlamasi, xodimga ko'rsatilmaydi.
+          Faqat ko'rish holatida ham yashiriladi (saqlash tugmasi yo'q). */}
+      {!isStaff && !readOnly && (
+        <Card style={{ padding: 20 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Layers size={16} color={colors.primary} />
+            <Text style={styles.cardTitle}>{t("tt.buffer_title")}</Text>
+          </View>
+          <Text style={[styles.cardDesc, { marginTop: 2, marginBottom: 16 }]}>
+            {t("tt.buffer_desc")}
+          </Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {BUFFER_OPTIONS.map((v) => (
+              <SelectPill
+                key={v}
+                label={v === 0 ? t("tt.buffer_none") : `${v} ${t("common.min")}`}
+                active={config.bufferMinutes === v}
+                onPress={() => setConfig((c) => ({ ...c, bufferMinutes: v }))}
+                style={{ flexGrow: 1 }}
+              />
+            ))}
+          </View>
+        </Card>
+      )}
     </Screen>
   );
 }
@@ -953,6 +1301,21 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.outlineVariant,
   },
+  staffPickerLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.onSurfaceVariant,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  staffChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 999,
+    maxWidth: 200,
+    overflow: "hidden",
+  },
+  staffChipText: { fontSize: 13, fontWeight: "700" },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary },
   clockText: { fontSize: 11, fontWeight: "700", color: colors.onSurface },
   clockSub: { fontSize: 10, fontWeight: "600", color: colors.onSurfaceVariant },
@@ -982,6 +1345,48 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     borderColor: alpha(colors.errorContainer, 0.4),
   },
   errorText: { flex: 1, color: colors.error, fontSize: 13, fontWeight: "600" },
+
+  // ── Jadval rejimi va "faqat ko'rish" izohi ──
+  modeCard: { padding: 20, gap: 12 },
+  modeHint: { fontSize: 12, color: colors.onSurfaceVariant, lineHeight: 17 },
+  noteBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    overflow: "hidden",
+  },
+  noteBoxFallback: {
+    backgroundColor: colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  noteTitle: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.onSurfaceVariant,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  noteText: { fontSize: 12, color: colors.onSurfaceVariant, lineHeight: 17, marginTop: 3 },
+
+  // Faqat ko'rish qatorlari — tahrirlanadigan maydonlar o'rniga xira matn
+  roRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: alpha(colors.surfaceContainer, 0.6),
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    borderRadius: radius.lg,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+    marginBottom: 8,
+  },
+  roTime: { fontSize: 13, fontWeight: "700", color: colors.onSurfaceVariant, letterSpacing: 0.3 },
+  roLabel: { flex: 1, fontSize: 12, color: colors.onSurfaceVariant },
   errorLink: {
     color: colors.error,
     fontSize: 12,

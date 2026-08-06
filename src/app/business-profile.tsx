@@ -1,10 +1,14 @@
 // Biznes profili yaratish/tahrirlash — _port_reference/CreateBusinessProfile.tsx,
 // useBusinessProfile.ts va business.ts dan port. Rasm: expo-image-picker,
 // xarita: WebView Yandex Maps, tarjima: bevosita utils/translate.ts.
+//
+// Klinika XODIMI (shifokor) shu sahifani KO'RADI, lekin tahrirlay olmaydi:
+// maydonlar qulflanadi, rasm tanlash va saqlash tugmasi ko'rsatilmaydi.
+// Ega uchun hech narsa o'zgarmaydi.
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { ArrowLeft, Camera, Star, X } from "lucide-react-native";
+import { ArrowLeft, Camera, Lock, Star, X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -28,6 +32,7 @@ import { useAuth } from "@/context/AuthContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useProvider } from "@/context/ProviderContext";
+import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
 import { translateMultilingual } from "@/utils/translate";
@@ -54,6 +59,21 @@ function formatUzPhone(raw: string): string {
   return out;
 }
 
+// Faqat ko'rish uchun maydon — SelectField o'rnida (tanlash oynasi ochilmaydi)
+function ReadonlyField({ label, value }: { label: string; value: string }) {
+  const styles = useStyles();
+  return (
+    <View>
+      <Text style={styles.label}>{label}</Text>
+      <View style={styles.roField}>
+        <Text style={styles.roValue} numberOfLines={2}>
+          {value || "—"}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
 export default function BusinessProfileScreen() {
   const styles = useStyles();
   const colors = useColors();
@@ -63,6 +83,9 @@ export default function BusinessProfileScreen() {
   const { t } = useLanguage();
   const { showToast } = useToast();
   const insets = useSafeAreaInsets();
+  // Shifokor — klinika ma'lumotlarini faqat ko'radi
+  const { isStaff } = useStaffRoleContext();
+  const readOnly = isStaff;
 
   const editId = provider?.id || null;
 
@@ -351,8 +374,18 @@ export default function BusinessProfileScreen() {
           <GlassIconButton onPress={() => router.back()}>
             <ArrowLeft size={18} color={colors.onSurfaceVariant} />
           </GlassIconButton>
-          <Text style={styles.title}>{editId ? t("ab.edit_title") : t("ab.title")}</Text>
+          <Text style={styles.title}>
+            {readOnly ? t("biz.view_title") : editId ? t("ab.edit_title") : t("ab.title")}
+          </Text>
         </View>
+
+        {/* Xodimga: sahifa qulflangan ekanini qisqa izohlaymiz */}
+        {readOnly ? (
+          <GlassSurface style={styles.noteBox} fallbackStyle={styles.noteBoxFallback}>
+            <Lock size={14} color={colors.onSurfaceVariant} />
+            <Text style={styles.noteText}>{t("biz.readonly_note")}</Text>
+          </GlassSurface>
+        ) : null}
 
         {/* Asosiy ma'lumot */}
         <GlassSurface style={styles.card} fallbackStyle={styles.cardFallback}>
@@ -361,9 +394,10 @@ export default function BusinessProfileScreen() {
             <TextInput
               value={businessName}
               onChangeText={setBusinessName}
+              editable={!readOnly}
               placeholder={t("ab.business_name_ph")}
               placeholderTextColor={colors.outline}
-              style={styles.input}
+              style={[styles.input, readOnly && styles.inputReadonly]}
             />
           </View>
 
@@ -372,40 +406,60 @@ export default function BusinessProfileScreen() {
             <TextInput
               value={slug}
               onChangeText={(v) => setSlug(v.toLowerCase().replace(/[^a-z0-9\-_]/g, ""))}
+              editable={!readOnly}
               autoCapitalize="none"
               placeholder="my-business"
               placeholderTextColor={colors.outline}
-              style={styles.input}
+              style={[styles.input, readOnly && styles.inputReadonly]}
             />
-            <Text style={styles.hint}>{t("ab.slug_hint")}</Text>
+            {readOnly ? null : <Text style={styles.hint}>{t("ab.slug_hint")}</Text>}
           </View>
 
-          <SelectField
-            label={t("ab.category")}
-            value={selectedCategoryId}
-            options={categories.map((c) => ({ value: c.id, label: localize(c.name) }))}
-            placeholder={t("ab.loading_categories")}
-            onChange={setSelectedCategoryId}
-          />
+          {readOnly ? (
+            <ReadonlyField
+              label={t("ab.category")}
+              value={localize(categories.find((c) => c.id === selectedCategoryId)?.name)}
+            />
+          ) : (
+            <SelectField
+              label={t("ab.category")}
+              value={selectedCategoryId}
+              options={categories.map((c) => ({ value: c.id, label: localize(c.name) }))}
+              placeholder={t("ab.loading_categories")}
+              onChange={setSelectedCategoryId}
+            />
+          )}
 
-          <SelectField
-            label={t("ab.select_region")}
-            value={selectedRegionId}
-            options={regions.map((r) => ({ value: r.id, label: localize(r.name) }))}
-            placeholder={t("ab.select_region")}
-            onChange={setSelectedRegionId}
-          />
+          {readOnly ? (
+            <ReadonlyField
+              label={t("ab.select_region")}
+              value={localize(regions.find((r) => r.id === selectedRegionId)?.name)}
+            />
+          ) : (
+            <SelectField
+              label={t("ab.select_region")}
+              value={selectedRegionId}
+              options={regions.map((r) => ({ value: r.id, label: localize(r.name) }))}
+              placeholder={t("ab.select_region")}
+              onChange={setSelectedRegionId}
+            />
+          )}
 
           <View>
             <Text style={styles.label}>{t("ab.about")}</Text>
             <TextInput
               value={about}
               onChangeText={setAbout}
+              editable={!readOnly}
               placeholder={t("ab.about_ph")}
               placeholderTextColor={colors.outline}
               multiline
               numberOfLines={4}
-              style={[styles.input, { minHeight: 96, textAlignVertical: "top" }]}
+              style={[
+                styles.input,
+                { minHeight: 96, textAlignVertical: "top" },
+                readOnly && styles.inputReadonly,
+              ]}
             />
           </View>
 
@@ -414,10 +468,11 @@ export default function BusinessProfileScreen() {
             <TextInput
               value={phoneNumber}
               onChangeText={(v) => setPhoneNumber(formatUzPhone(v))}
+              editable={!readOnly}
               keyboardType="phone-pad"
               placeholder="+998 (90) 123 45 67"
               placeholderTextColor={colors.outline}
-              style={styles.input}
+              style={[styles.input, readOnly && styles.inputReadonly]}
             />
           </View>
         </GlassSurface>
@@ -425,7 +480,11 @@ export default function BusinessProfileScreen() {
         {/* Joylashuv */}
         <GlassSurface style={styles.card} fallbackStyle={styles.cardFallback}>
           <Text style={styles.label}>{t("ab.location")}</Text>
-          <LocationPicker coordinates={mapCoordinates} onChange={setMapCoordinates} />
+          <LocationPicker
+            coordinates={mapCoordinates}
+            onChange={setMapCoordinates}
+            readOnly={readOnly}
+          />
           <Text style={styles.hint}>
             {mapCoordinates[0]}, {mapCoordinates[1]}
           </Text>
@@ -438,41 +497,52 @@ export default function BusinessProfileScreen() {
             {images.map((img, i) => (
               <View key={img.uri + i} style={styles.imageWrap}>
                 <Image source={{ uri: img.uri }} style={styles.image} contentFit="cover" />
-                <Pressable style={styles.imageRemove} onPress={() => removeImage(i)}>
-                  <GlassSurface
-                    style={styles.imageBtnGlass}
-                    fallbackStyle={{ backgroundColor: colors.errorContainer }}
-                    tintColor={alpha(colors.errorContainer, 0.6)}
-                    interactive
-                  >
-                    <X size={12} color={colors.onErrorContainer} />
-                  </GlassSurface>
-                </Pressable>
-                <Pressable style={styles.imagePrimary} onPress={() => togglePrimary(i)}>
-                  <GlassSurface
-                    style={styles.imageBtnGlass}
-                    fallbackStyle={{
-                      backgroundColor: img.is_primary ? colors.primary : alpha("#000000", 0.5),
-                    }}
-                    tintColor={img.is_primary ? colors.primary : undefined}
-                    interactive
-                  >
-                    <Star
-                      size={12}
-                      color={img.is_primary ? colors.onPrimary : colors.onSurfaceVariant}
-                    />
-                  </GlassSurface>
-                </Pressable>
+                {/* Xodimda rasm o'chirish/asosiy qilish tugmalari yo'q */}
+                {readOnly ? null : (
+                  <>
+                    <Pressable style={styles.imageRemove} onPress={() => removeImage(i)}>
+                      <GlassSurface
+                        style={styles.imageBtnGlass}
+                        fallbackStyle={{ backgroundColor: colors.errorContainer }}
+                        tintColor={alpha(colors.errorContainer, 0.6)}
+                        interactive
+                      >
+                        <X size={12} color={colors.onErrorContainer} />
+                      </GlassSurface>
+                    </Pressable>
+                    <Pressable style={styles.imagePrimary} onPress={() => togglePrimary(i)}>
+                      <GlassSurface
+                        style={styles.imageBtnGlass}
+                        fallbackStyle={{
+                          backgroundColor: img.is_primary ? colors.primary : alpha("#000000", 0.5),
+                        }}
+                        tintColor={img.is_primary ? colors.primary : undefined}
+                        interactive
+                      >
+                        <Star
+                          size={12}
+                          color={img.is_primary ? colors.onPrimary : colors.onSurfaceVariant}
+                        />
+                      </GlassSurface>
+                    </Pressable>
+                  </>
+                )}
               </View>
             ))}
-            <Pressable style={styles.addImage} onPress={pickImages}>
-              <Camera size={20} color={colors.primary} />
-            </Pressable>
+            {readOnly ? (
+              images.length === 0 ? (
+                <Text style={styles.hint}>{t("biz.no_photos")}</Text>
+              ) : null
+            ) : (
+              <Pressable style={styles.addImage} onPress={pickImages}>
+                <Camera size={20} color={colors.primary} />
+              </Pressable>
+            )}
           </View>
         </GlassSurface>
 
-        {/* Yuborish */}
-        {submitting ? (
+        {/* Yuborish — xodimda saqlash tugmasi umuman ko'rsatilmaydi */}
+        {readOnly ? null : submitting ? (
           <View style={styles.submitting}>
             <AnimatedLogo variant="loading" size={48} />
             {status ? <Text style={styles.submittingText}>{status}</Text> : null}
@@ -524,6 +594,36 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     fontWeight: "500",
     color: colors.onSurface,
   },
+  // Faqat ko'rish: maydon o'chirilgandek ko'rinadi, lekin joylashuv o'zgarmaydi
+  inputReadonly: {
+    color: colors.onSurfaceVariant,
+    backgroundColor: alpha(colors.surfaceContainerHighest, 0.5),
+  },
+  roField: {
+    backgroundColor: alpha(colors.surfaceContainerHighest, 0.5),
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    borderRadius: radius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  roValue: { fontSize: 14, fontWeight: "500", color: colors.onSurfaceVariant },
+  noteBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    overflow: "hidden",
+  },
+  noteBoxFallback: {
+    backgroundColor: colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  noteText: { flex: 1, fontSize: 12, fontWeight: "600", color: colors.onSurfaceVariant },
+
   hint: { fontSize: 11, color: colors.onSurfaceVariant, marginTop: 4 },
 
   imagesRow: { flexDirection: "row", flexWrap: "wrap", gap: 10 },

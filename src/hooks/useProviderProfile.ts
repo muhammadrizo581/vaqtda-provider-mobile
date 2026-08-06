@@ -1,6 +1,11 @@
 // Joriy foydalanuvchining provider profili (providers jadvalidan).
+//
+// Ega (owner) uchun — o'z biznesi (providers.user_id = uid).
+// Klinika xodimi (shifokor) uchun — u ishlaydigan klinika (provider_staff.provider_id).
+// Xodim uchun bu profil FAQAT o'qish uchun: biznes profilini u tahrirlay olmaydi.
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { supabase } from "@/lib/supabase";
 
 export interface ProviderProfile {
@@ -18,6 +23,11 @@ export interface ProviderProfile {
   is_active: boolean;
   phone_number?: string | null;
   region_id?: string | null;
+  // Klinika jadval rejimi: "shared" — butun biznesga bitta jadval,
+  // "individual" — har bir shifokor o'z jadvalini tuzadi.
+  // Ustun hali qo'shilmagan bo'lsa undefined bo'ladi — bunda eski
+  // xatti-harakat (har kimga alohida) saqlanib qoladi.
+  schedule_mode?: "shared" | "individual" | null;
   // To'lov sozlamalari (payment-settings sahifasi boshqaradi)
   prepayment_type?: "none" | "percent" | "fixed" | "full" | null;
   prepayment_percent?: number | null;
@@ -27,20 +37,29 @@ export interface ProviderProfile {
 export function useProviderProfile() {
   const { user } = useAuth();
   const userId = user?.id;
+  const { loading: roleLoading, isStaff, staffProviderId } = useStaffRoleContext();
   const [provider, setProvider] = useState<ProviderProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    if (!userId) return;
+    // Rol aniqlanmaguncha kutamiz — aks holda xodimga "biznesingiz yo'q"
+    // deb ko'rsatilib, keyin klinika yuklanib, ekran sakrab ketardi.
+    if (roleLoading) return;
+    if (!userId) {
+      setProvider(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    const { data } = await supabase
-      .from("providers")
-      .select("*")
-      .eq("user_id", userId)
-      .maybeSingle();
+    const base = supabase.from("providers").select("*");
+    // Xodim — o'zi ishlaydigan klinika; ega — o'z biznesi
+    const { data } =
+      isStaff && staffProviderId
+        ? await base.eq("id", staffProviderId).maybeSingle()
+        : await base.eq("user_id", userId).maybeSingle();
     setProvider((data as ProviderProfile) || null);
     setLoading(false);
-  }, [userId]);
+  }, [userId, roleLoading, isStaff, staffProviderId]);
 
   // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
   useEffect(() => {

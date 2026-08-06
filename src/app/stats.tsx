@@ -16,6 +16,7 @@ import { Screen } from "@/components/pv/screen";
 import { Card, GlassIconButton, GlassSurface, Spinner } from "@/components/pv/ui";
 import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProviderStats } from "@/hooks/useProviderStats";
 
@@ -106,6 +107,9 @@ export default function StatsScreen() {
   const ru = lang === "ru";
   const router = useRouter();
   const { loading, bookings, slots } = useProviderStats();
+  // Shifokor uchun raqamlar faqat uning o'z bronlaridan olinadi (hook'da
+  // staff_id bo'yicha filtrlangan) — buni ekranda ham eslatib qo'yamiz
+  const { isStaff } = useStaffRoleContext();
   const [period, setPeriod] = useState<Period>("month");
 
   const stats = useMemo(() => {
@@ -198,8 +202,11 @@ export default function StatsScreen() {
         <View style={styles.titleIcon}>
           <BarChart3 size={18} color={colors.primary} />
         </View>
-        <Text style={styles.title}>{t("stats.title")}</Text>
+        <Text style={styles.title}>{isStaff ? t("stf.my_stats") : t("stats.title")}</Text>
       </View>
+
+      {/* Shifokorga: raqamlar faqat uning bronlari bo'yicha */}
+      {isStaff ? <Text style={styles.scopeNote}>{t("stf.my_stats_note")}</Text> : null}
 
       {/* Davr almashtirgich — shisha segment konteyner */}
       <GlassSurface style={styles.periodRow} fallbackStyle={styles.periodRowFallback}>
@@ -296,6 +303,7 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     backgroundColor: alpha(colors.primary, 0.1),
   },
   title: { fontSize: 20, fontWeight: "800", color: colors.onSurface },
+  scopeNote: { fontSize: 12, color: colors.onSurfaceVariant, marginTop: -4 },
 
   periodRow: {
     flexDirection: "row",

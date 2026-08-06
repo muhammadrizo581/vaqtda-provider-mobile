@@ -29,6 +29,7 @@ import {
 import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { useProvider } from "@/context/ProviderContext";
+import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useAppointments, type Appointment } from "@/hooks/useAppointments";
 import { useWaitlistEntries } from "@/hooks/useWaitlistEntries";
@@ -45,27 +46,33 @@ const toMin = (t?: string | null) => {
   return (h || 0) * 60 + (m || 0);
 };
 
-// Bugungi jadval slotlari — bandlik foizi uchun
-function useTodaySlots(today: string) {
+// Bugungi jadval slotlari — bandlik foizi uchun.
+// Shifokor kirgan bo'lsa faqat O'Z slotlari olinadi (RLS ham shunday beradi).
+function useTodaySlots(today: string, staffId: string | null) {
   const { provider } = useProvider();
   const providerId = provider?.id;
+  // Klinikada jadval "shared" rejimida butun biznesga umumiy bo'ladi — u holda
+  // shifokorning ish vaqti staff_id NULL bo'lgan qatorlarda turadi.
+  const sharedSchedule = provider?.schedule_mode === "shared";
   const [slots, setSlots] = useState<{ start_time: string; end_time: string }[]>([]);
   useEffect(() => {
     if (!providerId) return;
     let cancelled = false;
     const timer = setTimeout(async () => {
-      const { data } = await supabase
+      let q = supabase
         .from("timetable_slots")
         .select("start_time, end_time")
         .eq("provider_id", providerId)
         .eq("slot_date", today);
+      if (staffId) q = sharedSchedule ? q.is("staff_id", null) : q.eq("staff_id", staffId);
+      const { data } = await q;
       if (!cancelled) setSlots((data as { start_time: string; end_time: string }[]) || []);
     }, 0);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [providerId, today]);
+  }, [providerId, today, staffId, sharedSchedule]);
   return slots;
 }
 
@@ -160,12 +167,20 @@ function OverviewContent() {
   const colors = useColors();
   const styles = useStyles();
   const { t } = useLanguage();
-  const { appointments, loading, reload } = useAppointments();
+  const { appointments: allAppointments, loading, reload } = useAppointments();
   const { entries: waitlist, reload: reloadWaitlist } = useWaitlistEntries();
+  const { isStaff, staffId } = useStaffRoleContext();
   const router = useRouter();
 
   const now = tashkentClock.now();
   const today = now.dateStr;
+
+  // Shifokor uchun boshqaruv paneli faqat uning o'z bronlaridan tuziladi
+  const appointments = useMemo(
+    () =>
+      isStaff && staffId ? allAppointments.filter((a) => a.staff_id === staffId) : allAppointments,
+    [allAppointments, isStaff, staffId]
+  );
 
   const todays = useMemo(
     () =>
@@ -188,7 +203,7 @@ function OverviewContent() {
   }, [todays, appointments, waitlist, today]);
 
   // ── Statistika bo'limi hisob-kitoblari ──
-  const todaySlots = useTodaySlots(today);
+  const todaySlots = useTodaySlots(today, isStaff ? staffId : null);
 
   // Bugungi bandlik: band daqiqalar / jadvaldagi ochiq daqiqalar
   const occupancy = useMemo(() => {
@@ -320,6 +335,8 @@ function OverviewContent() {
           <Text style={styles.title}>{t("pv.nav_dashboard")}</Text>
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
+          {/* Statistika — egada butun biznes, shifokorda faqat o'z bronlari
+              kesimida hisoblanadi (useProviderStats staff_id bo'yicha filtrlaydi) */}
           <GlassIconButton onPress={() => router.push("/stats")}>
             <BarChart3 size={18} color={colors.onSurfaceVariant} />
           </GlassIconButton>
@@ -357,17 +374,20 @@ function OverviewContent() {
             </Text>
           </View>
         </GlassSurface>
-        <GlassSurface style={styles.chip} fallbackStyle={styles.chipFallback}>
-          <View style={[styles.chipIcon, { backgroundColor: alpha(colors.secondaryContainer, 0.18) }]}>
-            <Hourglass size={16} color={colors.secondary} />
-          </View>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.chipValue}>{stats.activeWaitlist}</Text>
-            <Text style={styles.chipLabel} numberOfLines={1}>
-              {t("pv.stat_waitlist")}
-            </Text>
-          </View>
-        </GlassSurface>
+        {/* Navbat — butun biznesga tegishli, shifokorda ko'rsatilmaydi */}
+        {!isStaff && (
+          <GlassSurface style={styles.chip} fallbackStyle={styles.chipFallback}>
+            <View style={[styles.chipIcon, { backgroundColor: alpha(colors.secondaryContainer, 0.18) }]}>
+              <Hourglass size={16} color={colors.secondary} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.chipValue}>{stats.activeWaitlist}</Text>
+              <Text style={styles.chipLabel} numberOfLines={1}>
+                {t("pv.stat_waitlist")}
+              </Text>
+            </View>
+          </GlassSurface>
+        )}
       </View>
 
       {/* ── Statistika ── Spinner faqat birinchi yuklanishda; refresh'da tepadagi logo yetadi */}

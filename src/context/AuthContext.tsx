@@ -50,8 +50,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             ? "provider"
             : "client";
 
-      if (role !== "provider") {
-        // Provayder bo'lmagan akkaunt panelga kirmaydi — sessiya jimgina yopiladi.
+      // Panelga kirish huquqi: provayder roli YOKI klinikaga biriktirilgan
+      // shifokor (provider_staff.user_id) yoki emailiga taklif yuborilgan xodim.
+      // Shifokor boshqa joyda mijoz ham bo'lishi mumkin — shuning uchun rolni
+      // o'zgartirmaymiz, faqat kirishga ruxsat beramiz.
+      let allowed = role === "provider";
+      if (!allowed) {
+        const { data: canAccess } = await supabase.rpc("can_access_provider_panel");
+        allowed = canAccess === true;
+      }
+
+      if (!allowed) {
+        // Ruxsati yo'q akkaunt panelga kirmaydi — sessiya jimgina yopiladi.
         // setTimeout: onAuthStateChange callback ichida auth metodini chaqirish deadlock beradi.
         setUser(null);
         setIsAuthenticated(false);
@@ -110,8 +120,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let email = identifier.trim();
     if (!email.includes("@")) {
       const { data: resolved } = await supabase.rpc("email_for_username", { uname: email });
-      if (!resolved) return { error: "invalid_credentials" };
-      email = resolved as string;
+      let target = (resolved as string | null) || null;
+      if (!target) {
+        // Klinika xodimi logini (masalan "akfa-medline.ali-qosimov") —
+        // biznes egasi yaratgan akkaunt, worker_credentials jadvalida
+        const { data: workerEmail } = await supabase.rpc("worker_email_for_username", {
+          p_login: email,
+        });
+        target = (workerEmail as string | null) || null;
+      }
+      if (!target) return { error: "invalid_credentials" };
+      email = target;
     }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
@@ -124,7 +143,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq("id", data.user.id)
       .maybeSingle();
     const dbRole = (profile?.role || "client").toLowerCase();
-    const isProvider = dbRole === "provider" || dbRole === "specialist" || dbRole === "partner";
+    let isProvider = dbRole === "provider" || dbRole === "specialist" || dbRole === "partner";
+    if (!isProvider) {
+      // Klinika xodimi (shifokor) ham panelga kiradi — o'z jadvali va bronlari uchun
+      const { data: canAccess } = await supabase.rpc("can_access_provider_panel");
+      isProvider = canAccess === true;
+    }
     if (!isProvider) {
       await supabase.auth.signOut();
       return { error: "invalid_credentials" };

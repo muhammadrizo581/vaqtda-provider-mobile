@@ -11,9 +11,12 @@ const YANDEX_MAPS_KEY = "6bac23fd-42ad-42d1-aceb-3fd1630a9ac8";
 export function LocationPicker({
   coordinates,
   onChange,
+  readOnly = false,
 }: {
   coordinates: [number, number]; // [lat, lng]
   onChange: (coords: [number, number]) => void;
+  /** Faqat ko'rish (masalan, klinika xodimi uchun): nuqta ko'chirilmaydi */
+  readOnly?: boolean;
 }) {
   const colors = useColors();
   const styles = useStyles();
@@ -29,13 +32,14 @@ export function LocationPicker({
   <div id="map"></div>
   <script>
     ymaps.ready(function () {
+      var readOnly = ${readOnly ? "true" : "false"};
       var map = new ymaps.Map('map', {
         center: [${coordinates[0]}, ${coordinates[1]}],
         zoom: 13,
         controls: ['zoomControl'],
       });
       var placemark = new ymaps.Placemark([${coordinates[0]}, ${coordinates[1]}], {}, {
-        draggable: true,
+        draggable: !readOnly,
         preset: 'islands#violetDotIcon',
       });
       map.geoObjects.add(placemark);
@@ -43,11 +47,13 @@ export function LocationPicker({
         var c = placemark.geometry.getCoordinates();
         window.ReactNativeWebView.postMessage(JSON.stringify(c));
       }
-      placemark.events.add('dragend', report);
-      map.events.add('click', function (e) {
-        placemark.geometry.setCoordinates(e.get('coords'));
-        report();
-      });
+      if (!readOnly) {
+        placemark.events.add('dragend', report);
+        map.events.add('click', function (e) {
+          placemark.geometry.setCoordinates(e.get('coords'));
+          report();
+        });
+      }
     });
   </script>
 </body>

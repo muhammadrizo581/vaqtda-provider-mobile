@@ -27,8 +27,10 @@ import {
 } from "@/components/pv/ui";
 import { alpha } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useAppointments, type Appointment } from "@/hooks/useAppointments";
+import { useBookingMode } from "@/hooks/useBookingMode";
 import { localize } from "@/utils/localize";
 import { formatSom } from "@/utils/price";
 import { addDaysStr, createTashkentClock, formatUzDate, UZ_WEEKDAYS, weekdayKeyOf } from "@/utils/tashkent";
@@ -105,7 +107,18 @@ function AppointmentsContent() {
   const colors = useColors();
   const styles = useStyles();
   const { t, lang } = useLanguage();
-  const { appointments, loading, reload, act } = useAppointments();
+  const { appointments: allAppointments, loading, reload, act } = useAppointments();
+  // Shifoxona rejimi — bron qatorida shifokor ismi ko'rsatiladi
+  const { usesStaff } = useBookingMode();
+  const { isStaff, staffId } = useStaffRoleContext();
+
+  // Shifokor faqat O'ZIGA yozilgan bemorlarni ko'radi (RLS ham shunday cheklaydi,
+  // bu esa UI tomonidagi kafolat: boshqa doktorning broni chiqib qolmasin)
+  const appointments = useMemo(
+    () =>
+      isStaff && staffId ? allAppointments.filter((a) => a.staff_id === staffId) : allAppointments,
+    [allAppointments, isStaff, staffId]
+  );
   const today = tashkentClock.now().dateStr;
   const tomorrow = addDaysStr(today, 1);
 
@@ -386,6 +399,13 @@ function AppointmentsContent() {
                               : ""}
                           {a.price != null ? ` · ${formatSom(a.price)}` : ""}
                         </Text>
+                        {/* Shifoxona: qaysi shifokorga yozilgan — bitta so'nik qator.
+                            Shifokorning o'zida bu ortiqcha: hammasi uniki. */}
+                        {usesStaff && !isStaff && a.staff_name ? (
+                          <Text style={styles.service} numberOfLines={1}>
+                            {t("stf.doctor")}: {a.staff_name}
+                          </Text>
+                        ) : null}
                         {a.client?.phone ? (
                           <Pressable
                             onPress={() => Linking.openURL(`tel:${a.client!.phone}`)}

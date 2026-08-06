@@ -28,6 +28,9 @@ export interface Appointment {
   table_id: string | null;
   date_to: string | null; // YYYY-MM-DD
   table_name: string | null;
+  // Shifoxona: tanlangan shifokor (provider_staff)
+  staff_id: string | null;
+  staff_name: string | null;
 }
 
 export function useAppointments() {
@@ -49,10 +52,21 @@ export function useAppointments() {
         "id, client_id, booking_date, start_time, end_time, duration_minutes, status, notes, price, service_id, created_at";
       let { data: bookings, error: err } = await supabase
         .from("bookings")
-        .select(`${BASE_COLS}, table_id, date_to, services(name)`)
+        .select(`${BASE_COLS}, table_id, date_to, staff_id, services(name)`)
         .eq("provider_id", providerId)
         .order("booking_date", { ascending: false })
         .order("start_time", { ascending: false });
+      if (err) {
+        // staff_id ustuni hali qo'shilmagan bo'lsa — usiz qayta so'raymiz
+        const noStaff = await supabase
+          .from("bookings")
+          .select(`${BASE_COLS}, table_id, date_to, services(name)`)
+          .eq("provider_id", providerId)
+          .order("booking_date", { ascending: false })
+          .order("start_time", { ascending: false });
+        bookings = noStaff.data as any;
+        err = noStaff.error;
+      }
       if (err) {
         // table_id/date_to ustunlari hali qo'shilmagan bo'lsa (SQL ishga
         // tushirilmagan) — eski ustunlar bilan qayta so'raymiz
@@ -89,12 +103,26 @@ export function useAppointments() {
         tableNames = Object.fromEntries((tbls || []).map((x: any) => [x.id, x.name]));
       }
 
+      // Shifokorlar ismlari (staff_id bo'lgan bronlar uchun). Jadval hali
+      // yaratilmagan bo'lsa — bo'sh qoladi, bron qatorida shifokor ko'rsatilmaydi.
+      const staffIds = [...new Set((bookings || []).map((b: any) => b.staff_id).filter(Boolean))];
+      let staffNames: Record<string, string> = {};
+      if (staffIds.length > 0) {
+        const { data: stf } = await supabase
+          .from("provider_staff")
+          .select("id, full_name")
+          .in("id", staffIds);
+        staffNames = Object.fromEntries((stf || []).map((x: any) => [x.id, x.full_name]));
+      }
+
       setAppointments(
         (bookings || []).map((b: any) => ({
           ...b,
+          staff_id: b.staff_id ?? null,
           services: Array.isArray(b.services) ? b.services[0] || null : b.services,
           client: profiles[b.client_id] || null,
           table_name: b.table_id ? tableNames[b.table_id] || null : null,
+          staff_name: b.staff_id ? staffNames[b.staff_id] || null : null,
         }))
       );
     } catch {
