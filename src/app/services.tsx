@@ -1,11 +1,12 @@
 // Xizmatlar boshqaruvi — saytdagi app/dashboard/services/page.tsx dan port.
 // Tarjima /api/translate o'rniga bevosita utils/translate.ts orqali qilinadi.
 import { useRouter } from "expo-router";
-import { AlertCircle, ArrowLeft, Clock, Eye, EyeOff, Pencil, Plus, Save, Tag, Trash2, X } from "lucide-react-native";
-import React, { useCallback, useEffect, useState } from "react";
+import { AlertCircle, ArrowLeft, Clock, Eye, EyeOff, Lock, Pencil, Plus, Save, Tag, Trash2, X } from "lucide-react-native";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BusinessGate } from "@/components/pv/business-gate";
 import { Screen } from "@/components/pv/screen";
+import { SelectField } from "@/components/pv/select-field";
 import { TablesManager } from "@/components/pv/tables-manager";
 import { useToast } from "@/components/pv/toast";
 import {
@@ -23,6 +24,7 @@ import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
+import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { useBookingMode } from "@/hooks/useBookingMode";
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
@@ -39,6 +41,23 @@ interface Service {
   duration_minutes: number;
   is_active: boolean;
   sort_order: number;
+  // Shifoxona rejimi: xizmat qaysi bo'limga tegishli (ustun bo'lmasa — undefined)
+  department_id?: string | null;
+  // Klinika rejimi: xizmat qaysi shifokorniki (workers.id = provider_staff.id).
+  // null/undefined — biznes darajasidagi ("umumiy") eski xizmat.
+  worker_id?: string | null;
+}
+
+// Bo'lim (provider_departments) — faqat nom ko'rsatish uchun kerakli ustunlar
+interface Department {
+  id: string;
+  name: any;
+}
+
+// Shifokor — xizmatlarni guruhlash uchun (faqat ism kerak)
+interface Worker {
+  id: string;
+  full_name: string;
 }
 
 const DURATION_PRESETS = [15, 20, 30, 45, 60, 90, 120];
@@ -50,14 +69,31 @@ function ServicesContent() {
   const { provider } = useProvider();
   const { showToast } = useToast();
   const router = useRouter();
-  const { mode, unit, loading: modeLoading } = useBookingMode();
+  const { mode, unit, usesDepartments, usesStaff, loading: modeLoading } = useBookingMode();
   const providerId = provider?.id || null;
   // daily (dacha/villa) — narx kunlik, davomiylik so'ralmaydi, xizmatlar ixtiyoriy
   const daily = mode === "daily";
   // table (restoran, kompyuter klub) — xizmat tushunchasi yo'q, faqat stollar/kompyuterlar
   const tableMode = mode === "table";
 
+  // ── Klinika: xizmatlarni har bir shifokor o'zi boshqaradi ───────────────────
+  // services.worker_id — xizmat egasi (workers.id = provider_staff.id).
+  //   shifokor — faqat O'Z xizmatlarini ko'radi va tahrirlaydi;
+  //   rahbar   — hammasini shifokorlar kesimida FAQAT ko'radi (biriktirilmagan
+  //              "Umumiy" xizmatlardan tashqari — ularni u tahrirlay oladi).
+  // Ustun hali qo'shilmagan bo'lsa (workerCol=false) eski xatti-harakat qoladi.
+  const { isOwner, isStaff, staffId } = useStaffRoleContext();
+  const [workerCol, setWorkerCol] = useState(false);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const myServices = workerCol && isStaff && !!staffId;
+  const clinicOwner = workerCol && usesStaff && isOwner;
+  // Ustun hali qo'shilmagan bo'lsa shifokor xizmatga ega bo'la olmaydi —
+  // ro'yxat unga faqat ko'rish uchun ko'rsatiladi (biznes xizmatlarini u
+  // tahrirlamasligi kerak)
+  const staffReadOnly = isStaff && !myServices;
+
   const [services, setServices] = useState<Service[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Form holati
@@ -68,6 +104,9 @@ function ServicesContent() {
   const [duration, setDuration] = useState(30);
   const [customDuration, setCustomDuration] = useState("");
   const [description, setDescription] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
+  // Shifokorning o'z bo'limi (u tanlamaydi — biriktirilgani ishlatiladi)
+  const [myDepartmentId, setMyDepartmentId] = useState<string | null>(null);
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -75,15 +114,69 @@ function ServicesContent() {
   const load = useCallback(async () => {
     if (!providerId) return;
     setLoading(true);
-    const { data } = await supabase
+
+    // worker_id ustuni bormi — yo'q bo'lsa xizmatlar biznes darajasida qoladi
+    // (bugungi xatti-harakat), sahifa esa xato bermaydi.
+    let hasWorker = false;
+    if (usesStaff || isStaff) {
+      const { error } = await supabase
+        .from("services")
+        .select("worker_id")
+        .eq("provider_id", providerId)
+        .limit(1);
+      hasWorker = !error;
+    }
+    setWorkerCol(hasWorker);
+
+    let q = supabase
       .from("services")
       .select("*")
       .eq("provider_id", providerId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
+    // Shifokor faqat o'z xizmatlarini boshqaradi
+    if (hasWorker && isStaff && staffId) q = q.eq("worker_id", staffId);
+    const { data } = await q;
     setServices((data as Service[]) || []);
+
+    // Shifokorning O'Z bo'limi — u allaqachon bitta bo'limga biriktirilgan,
+    // shuning uchun xizmat qo'shishda bo'lim tanlanmaydi, avtomatik shu bo'lim
+    // qo'yiladi (masalan Ali → Nevrologiya).
+    if (isStaff && staffId) {
+      const { data: me } = await supabase
+        .from("provider_staff")
+        .select("department_id")
+        .eq("id", staffId)
+        .maybeSingle();
+      setMyDepartmentId((me?.department_id as string | null) || null);
+    } else {
+      setMyDepartmentId(null);
+    }
+
+    // Shifokorlar ro'yxati — rahbarga xizmatlarni doktorlar kesimida ko'rsatish
+    // uchun. Nofaol shifokorlar ham kerak: ularning xizmatlari yo'qolib qolmasin.
+    if (hasWorker && usesStaff && !isStaff) {
+      const { data: st } = await supabase
+        .from("provider_staff")
+        .select("id, full_name")
+        .eq("provider_id", providerId)
+        .order("sort_order", { ascending: true });
+      setWorkers((st as Worker[]) || []);
+    } else {
+      setWorkers([]);
+    }
+
+    // Bo'limlar — shifoxona rejimida xizmat qaysi bo'limga tegishliligini
+    // ko'rsatish uchun. Jadval hali yaratilmagan bo'lsa ro'yxat bo'sh qoladi.
+    const { data: deps } = await supabase
+      .from("provider_departments")
+      .select("*")
+      .eq("provider_id", providerId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    setDepartments((deps as Department[]) || []);
     setLoading(false);
-  }, [providerId]);
+  }, [providerId, usesStaff, isStaff, staffId]);
 
   // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
   useEffect(() => {
@@ -98,6 +191,7 @@ function ServicesContent() {
     setDuration(30);
     setCustomDuration("");
     setDescription("");
+    setDepartmentId("");
     setActive(true);
     setFormOpen(false);
   };
@@ -114,6 +208,7 @@ function ServicesContent() {
     setDuration(s.duration_minutes || 30);
     setCustomDuration(DURATION_PRESETS.includes(s.duration_minutes) ? "" : String(s.duration_minutes));
     setDescription(localize(s.description, lang) || "");
+    setDepartmentId(s.department_id || "");
     setActive(s.is_active);
     setFormOpen(true);
   };
@@ -144,7 +239,7 @@ function ServicesContent() {
       const priceNum = price.trim()
         ? Math.max(0, Math.round(Number(price.replace(/\s/g, ""))))
         : null;
-      const payload = {
+      const payload: Record<string, unknown> = {
         provider_id: providerId,
         name: nameVal,
         description: descVal,
@@ -153,16 +248,29 @@ function ServicesContent() {
         duration_minutes: daily ? 1440 : Math.max(5, duration),
         is_active: active,
       };
-
-      if (editId) {
-        const { error } = await supabase.from("services").update(payload).eq("id", editId);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from("services")
-          .insert({ ...payload, sort_order: services.length });
-        if (error) throw error;
+      // Bo'lim faqat shifoxona rejimida (uses_departments) yoziladi
+      // Shifokor xizmatni HAR DOIM o'z bo'limiga yaratadi — tanlov yo'q
+      if (usesDepartments) {
+        payload.department_id = myServices ? myDepartmentId : departmentId || null;
       }
+      // Shifokor qo'shgan xizmat o'ziga biriktiriladi
+      if (myServices) payload.worker_id = staffId;
+
+      const write = async (p: Record<string, unknown>): Promise<{ error: any }> =>
+        editId
+          ? supabase.from("services").update(p).eq("id", editId)
+          : supabase.from("services").insert({ ...p, sort_order: services.length });
+
+      let { error } = await write(payload);
+      if (error && (usesDepartments || myServices)) {
+        // department_id / worker_id ustunlari hali qo'shilmagan bo'lishi
+        // mumkin — ularsiz qayta urinamiz
+        const fallback = { ...payload };
+        delete fallback.department_id;
+        delete fallback.worker_id;
+        ({ error } = await write(fallback));
+      }
+      if (error) throw error;
       showToast(t("svc.saved"));
       resetForm();
       await load();
@@ -195,6 +303,28 @@ function ServicesContent() {
     }
   };
 
+  // Rahbar uchun xizmatlar shifokorlar kesimida guruhlanadi. Hech kimga
+  // biriktirilmagan ("Umumiy") xizmatlar alohida guruhda — faqat ularni rahbar
+  // tahrirlay oladi. Shifokori o'chirilgan xizmatlar ham shu guruhga tushadi,
+  // aks holda ular ekrandan butunlay yo'qolib qolardi.
+  const groups = useMemo<{ key: string; title: string; items: Service[]; editable: boolean }[]>(() => {
+    if (!clinicOwner) return [];
+    const known = new Set(workers.map((w) => w.id));
+    const result = workers
+      .map((w) => ({
+        key: w.id,
+        title: w.full_name,
+        items: services.filter((s) => s.worker_id === w.id),
+        editable: false,
+      }))
+      .filter((g) => g.items.length > 0);
+    const common = services.filter((s) => !s.worker_id || !known.has(s.worker_id));
+    if (common.length > 0) {
+      result.unshift({ key: "common", title: t("svc.group_common"), items: common, editable: true });
+    }
+    return result;
+  }, [clinicOwner, workers, services, t]);
+
   // Kategoriya rejimi aniqlanguncha noto'g'ri bo'lim ko'rinib qolmasin
   if (modeLoading) {
     return (
@@ -226,6 +356,99 @@ function ServicesContent() {
   }
 
   const noActive = !loading && !services.some((s) => s.is_active);
+  // Xizmat qaysi bo'limga tegishli — nomi (bo'lim topilmasa bo'sh matn)
+  const deptName = (s: Service) =>
+    localize(departments.find((d) => d.id === s.department_id)?.name, lang) || "";
+  const departmentOptions = [
+    { value: "", label: t("dep.none") },
+    ...departments.map((d) => ({ value: d.id, label: localize(d.name, lang) || "—" })),
+  ];
+
+  // Bitta xizmat kartasi. editable=false — faqat ko'rish: tahrirlash,
+  // yashirish va o'chirish tugmalari umuman chizilmaydi.
+  const serviceCard = (s: Service, editable: boolean) => (
+    <Card key={s.id} style={[{ padding: 20 }, !s.is_active && { opacity: 0.6 }]}>
+      <View style={styles.svcTop}>
+        <Text style={styles.svcName} numberOfLines={1}>
+          {localize(s.name, lang)}
+        </Text>
+        <View style={styles.svcDuration}>
+          <Clock size={12} color={colors.onSurfaceVariant} />
+          <Text style={styles.svcDurationText}>
+            {daily ? t("svc.per_day") : `${s.duration_minutes} ${t("common.min")}`}
+          </Text>
+        </View>
+      </View>
+
+      {/* Shifoxona rejimi: xizmat qaysi bo'limga tegishli */}
+      {usesDepartments && deptName(s) ? (
+        <Text style={styles.svcDept} numberOfLines={1}>
+          {deptName(s)}
+        </Text>
+      ) : null}
+
+      {localize(s.description, lang) ? (
+        <Text style={styles.svcDesc} numberOfLines={2}>
+          {localize(s.description, lang)}
+        </Text>
+      ) : null}
+
+      <View style={styles.svcPriceRow}>
+        <Text style={styles.svcPrice}>
+          {s.price != null ? formatSom(s.price) : t("svc.free_price")}
+        </Text>
+        {!s.is_active && (
+          <View style={styles.hiddenBadge}>
+            <Text style={styles.hiddenBadgeText}>{t("svc.hidden")}</Text>
+          </View>
+        )}
+      </View>
+
+      {editable ? (
+        <View style={styles.svcActions}>
+          <SmallButton
+            label={t("svc.edit")}
+            icon={Pencil}
+            variant="outline"
+            onPress={() => openEdit(s)}
+            style={{ flex: 1 }}
+          />
+          <Pressable onPress={() => toggleActive(s)}>
+            <GlassSurface style={styles.iconAction} fallbackStyle={styles.iconActionFallback} interactive>
+              {s.is_active ? (
+                <EyeOff size={14} color={colors.onSurfaceVariant} />
+              ) : (
+                <Eye size={14} color={colors.onSurfaceVariant} />
+              )}
+            </GlassSurface>
+          </Pressable>
+          {deleteId === s.id ? (
+            <Pressable onPress={() => remove(s.id)}>
+              <GlassSurface
+                style={styles.deleteConfirm}
+                fallbackStyle={{ backgroundColor: colors.errorContainer }}
+                tintColor={alpha(colors.errorContainer, 0.6)}
+                interactive
+              >
+                <Text style={styles.deleteConfirmText}>{t("svc.delete_q")}</Text>
+              </GlassSurface>
+            </Pressable>
+          ) : (
+            <Pressable onPress={() => setDeleteId(s.id)}>
+              <GlassSurface
+                style={styles.deleteBtn}
+                fallbackStyle={styles.deleteBtnFallback}
+                tintColor={alpha(colors.errorContainer, 0.3)}
+                interactive
+              >
+                <Trash2 size={14} color={colors.error} />
+              </GlassSurface>
+            </Pressable>
+          )}
+        </View>
+      ) : null}
+    </Card>
+  );
 
   return (
     <Screen refreshing={loading} onRefresh={load}>
@@ -234,15 +457,44 @@ function ServicesContent() {
           <ArrowLeft size={18} color={colors.onSurfaceVariant} />
         </GlassIconButton>
         <View style={{ flex: 1 }}>
+          {/* Shifokorda ekran uning SHAXSIY xizmatlarini boshqaradi,
+              rahbarda esa klinika bo'ylab faqat ko'rish ro'yxati */}
           <PageHeader
-            title={t("pv.services_title")}
-            subtitle={daily ? t("pv.services_sub_daily") : t("pv.services_sub")}
+            title={myServices ? t("svc.my_title") : t("pv.services_title")}
+            subtitle={
+              myServices
+                ? t("svc.my_sub")
+                : clinicOwner
+                  ? t("svc.clinic_sub")
+                  : daily
+                    ? t("pv.services_sub_daily")
+                    : t("pv.services_sub")
+            }
           />
         </View>
       </View>
 
-      {/* Slots rejimida xizmat majburiy — faol xizmat bo'lmasa ogohlantirish */}
-      {!daily && noActive && (
+      {/* "Faqat ko'rish" izohi — rahbarga (xizmat shifokorniki) yoki ustun
+          hali qo'shilmagan shifokorga (xizmat biznesniki) */}
+      {(clinicOwner || staffReadOnly) && (
+        <GlassSurface style={styles.noteBox} fallbackStyle={styles.noteBoxFallback}>
+          <Lock size={14} color={colors.onSurfaceVariant} />
+          <Text style={styles.noteText}>
+            {clinicOwner
+              ? t("svc.clinic_note")
+              : // Shifokor o'z xizmatini yarata olmayotgan bo'lsa — sabab
+                // deyarli doim services.worker_id ustuni yo'qligi. Buni
+                // yashirmasdan aytamiz, aks holda "nega tahrirlab bo'lmaydi"
+                // degan savol javobsiz qoladi.
+                t(workerCol ? "svc.staff_readonly" : "svc.needs_column")}
+          </Text>
+        </GlassSurface>
+      )}
+
+      {/* Slots rejimida xizmat majburiy — faol xizmat bo'lmasa ogohlantirish.
+          Faqat ko'rish holatlarida ko'rsatilmaydi: xizmatni bu yerdan
+          qo'shib bo'lmaydi. */}
+      {!daily && noActive && !clinicOwner && !staffReadOnly && (
         <GlassSurface
           style={styles.warnBanner}
           fallbackStyle={styles.warnBannerFallback}
@@ -253,7 +505,9 @@ function ServicesContent() {
         </GlassSurface>
       )}
 
-      {!formOpen && (
+      {/* Yuklanish tugagunchagina kutamiz: worker_id ustuni bor-yo'qligi shundan
+          keyin ma'lum bo'ladi, aks holda tugma bir zumda ko'rinib yo'qolardi */}
+      {!formOpen && !loading && !clinicOwner && !staffReadOnly && (
         <SmallButton label={t("svc.add")} icon={Plus} onPress={openAdd} />
       )}
 
@@ -275,6 +529,26 @@ function ServicesContent() {
               style={styles.input}
             />
           </View>
+
+          {/* Bo'lim — faqat kategoriya bo'limlar bilan ishlaganda (shifoxona).
+              Shifokor uchun tanlov yo'q: u biriktirilgan bo'limi ko'rsatiladi. */}
+          {usesDepartments && !myServices && (
+            <SelectField
+              label={t("dep.field")}
+              value={departmentId}
+              options={departmentOptions}
+              placeholder={t("dep.pick")}
+              onChange={setDepartmentId}
+            />
+          )}
+          {usesDepartments && myServices && myDepartmentId && (
+            <View>
+              <Text style={styles.label}>{t("dep.field")}</Text>
+              <Text style={styles.myDeptText}>
+                {localize(departments.find((d) => d.id === myDepartmentId)?.name, lang) || "—"}
+              </Text>
+            </View>
+          )}
 
           <View>
             <Text style={styles.label}>{t("svc.price")}</Text>
@@ -357,6 +631,25 @@ function ServicesContent() {
       {/* Ro'yxat */}
       {loading ? (
         <Spinner />
+      ) : clinicOwner ? (
+        /* Rahbar: shifokorlar kesimida, faqat ko'rish ("Umumiy" dan tashqari) */
+        groups.length === 0 ? (
+          <Card>
+            <EmptyState icon={Tag} title={t("svc.empty")} desc={t("svc.empty_clinic_desc")} />
+          </Card>
+        ) : (
+          groups.map((g) => (
+            <View key={g.key} style={styles.group}>
+              <View style={styles.groupHeader}>
+                <Text style={styles.groupTitle} numberOfLines={1}>
+                  {g.title}
+                </Text>
+                <Text style={styles.groupCount}>{t("svc.count", { n: g.items.length })}</Text>
+              </View>
+              {g.items.map((s) => serviceCard(s, g.editable))}
+            </View>
+          ))
+        )
       ) : services.length === 0 && !formOpen ? (
         <Card>
           <EmptyState
@@ -366,80 +659,7 @@ function ServicesContent() {
           />
         </Card>
       ) : (
-        services.map((s) => (
-          <Card key={s.id} style={[{ padding: 20 }, !s.is_active && { opacity: 0.6 }]}>
-            <View style={styles.svcTop}>
-              <Text style={styles.svcName} numberOfLines={1}>
-                {localize(s.name, lang)}
-              </Text>
-              <View style={styles.svcDuration}>
-                <Clock size={12} color={colors.onSurfaceVariant} />
-                <Text style={styles.svcDurationText}>
-                  {daily ? t("svc.per_day") : `${s.duration_minutes} ${t("common.min")}`}
-                </Text>
-              </View>
-            </View>
-
-            {localize(s.description, lang) ? (
-              <Text style={styles.svcDesc} numberOfLines={2}>
-                {localize(s.description, lang)}
-              </Text>
-            ) : null}
-
-            <View style={styles.svcPriceRow}>
-              <Text style={styles.svcPrice}>
-                {s.price != null ? formatSom(s.price) : t("svc.free_price")}
-              </Text>
-              {!s.is_active && (
-                <View style={styles.hiddenBadge}>
-                  <Text style={styles.hiddenBadgeText}>{t("svc.hidden")}</Text>
-                </View>
-              )}
-            </View>
-
-            <View style={styles.svcActions}>
-              <SmallButton
-                label={t("svc.edit")}
-                icon={Pencil}
-                variant="outline"
-                onPress={() => openEdit(s)}
-                style={{ flex: 1 }}
-              />
-              <Pressable onPress={() => toggleActive(s)}>
-                <GlassSurface style={styles.iconAction} fallbackStyle={styles.iconActionFallback} interactive>
-                  {s.is_active ? (
-                    <EyeOff size={14} color={colors.onSurfaceVariant} />
-                  ) : (
-                    <Eye size={14} color={colors.onSurfaceVariant} />
-                  )}
-                </GlassSurface>
-              </Pressable>
-              {deleteId === s.id ? (
-                <Pressable onPress={() => remove(s.id)}>
-                  <GlassSurface
-                    style={styles.deleteConfirm}
-                    fallbackStyle={{ backgroundColor: colors.errorContainer }}
-                    tintColor={alpha(colors.errorContainer, 0.6)}
-                    interactive
-                  >
-                    <Text style={styles.deleteConfirmText}>{t("svc.delete_q")}</Text>
-                  </GlassSurface>
-                </Pressable>
-              ) : (
-                <Pressable onPress={() => setDeleteId(s.id)}>
-                  <GlassSurface
-                    style={styles.deleteBtn}
-                    fallbackStyle={styles.deleteBtnFallback}
-                    tintColor={alpha(colors.errorContainer, 0.3)}
-                    interactive
-                  >
-                    <Trash2 size={14} color={colors.error} />
-                  </GlassSurface>
-                </Pressable>
-              )}
-            </View>
-          </Card>
-        ))
+        services.map((s) => serviceCard(s, !staffReadOnly))
       )}
     </Screen>
   );
@@ -470,6 +690,44 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     borderColor: alpha(colors.error, 0.4),
   },
   warnText: { flex: 1, fontSize: 13, fontWeight: "500", color: colors.onSurface, lineHeight: 18 },
+
+  // Rahbar uchun "faqat ko'rish" izohi — tinch, ikkilamchi blok
+  noteBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    borderRadius: radius.lg,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    overflow: "hidden",
+  },
+  noteBoxFallback: {
+    backgroundColor: colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  noteText: { flex: 1, fontSize: 12, color: colors.onSurfaceVariant, lineHeight: 17 },
+  // Shifokorning biriktirilgan bo'limi — tanlov emas, faqat ko'rsatkich
+  myDeptText: { fontSize: 14, fontWeight: "700", color: colors.primary, marginTop: 4 },
+
+  // Shifokorlar bo'yicha guruhlar (staff.tsx bilan bir xil ko'rinish)
+  group: { gap: 12 },
+  groupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 4,
+  },
+  groupTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.onSurfaceVariant,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+    flex: 1,
+  },
+  groupCount: { fontSize: 12, fontWeight: "500", color: colors.onSurfaceVariant },
 
   form: {
     borderRadius: radius.xl,
@@ -521,6 +779,14 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     borderRadius: radius.md,
   },
   svcDurationText: { fontSize: 11, fontWeight: "700", color: colors.onSurfaceVariant },
+  svcDept: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.primary,
+    marginTop: 6,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
   svcDesc: { fontSize: 13, color: colors.onSurfaceVariant, marginTop: 8 },
   svcPriceRow: {
     flexDirection: "row",

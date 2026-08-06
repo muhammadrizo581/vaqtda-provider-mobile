@@ -28,8 +28,10 @@ import {
 } from "@/components/pv/ui";
 import { alpha } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useAppointments, type Appointment } from "@/hooks/useAppointments";
+import { useBookingMode } from "@/hooks/useBookingMode";
 import { localize } from "@/utils/localize";
 import { formatSom } from "@/utils/price";
 import { addDaysStr, createTashkentClock, formatUzDate, UZ_WEEKDAYS, weekdayKeyOf } from "@/utils/tashkent";
@@ -106,7 +108,25 @@ function AppointmentsContent() {
   const colors = useColors();
   const styles = useStyles();
   const { t, lang } = useLanguage();
-  const { appointments, loading, reload, act, settleCashAndComplete } = useAppointments();
+  const {
+    appointments: allAppointments,
+    loading,
+    reload,
+    act,
+    settleCashAndComplete,
+  } = useAppointments();
+  // Xodimli rejim — bron qatorida usta/shifokor ismi ko'rsatiladi
+  const { usesStaff } = useBookingMode();
+  const { isStaff, staffId } = useStaffRoleContext();
+
+  // Xodim (usta/shifokor) faqat O'ZIGA yozilgan mijozlarni ko'radi (RLS ham shunday
+  // cheklaydi, bu esa UI tomonidagi kafolat: birovning broni chiqib qolmasin)
+  const appointments = useMemo(
+    () =>
+      isStaff && staffId ? allAppointments.filter((a) => a.staff_id === staffId) : allAppointments,
+    [allAppointments, isStaff, staffId]
+  );
+
   const today = tashkentClock.now().dateStr;
   const tomorrow = addDaysStr(today, 1);
 
@@ -417,7 +437,9 @@ function AppointmentsContent() {
                               : ""}
                           {a.price != null ? ` · ${formatSom(a.price)}` : ""}
                         </Text>
-                        {a.staff_name ? (
+                        {/* Bron qaysi usta/shifokorga yozilgan — bitta ixcham qator.
+                            Xodimning o'zida bu ortiqcha: hammasi uniki. */}
+                        {usesStaff && !isStaff && a.staff_name ? (
                           <View style={styles.workerRow}>
                             <Scissors size={12} color={colors.primary} />
                             <Text style={styles.workerText} numberOfLines={1}>

@@ -438,6 +438,30 @@ export const uz = {
   "tt.val_break_end": "{date}: tanaffus tugash vaqti boshlanishdan keyin bo'lishi kerak.",
   "tt.val_duration": "Sozlamalar: kamida bitta uchrashuv davomiyligini qo'shing (aks holda mijozlar bron qila olmaydi).",
 
+  // ── Jadval rejimi (klinika) ──
+  // shared — butun biznesga bitta jadval, individual — har bir shifokor o'ziniki
+  "sch.mode_title": "Jadval rejimi",
+  "sch.mode_desc": "Klinikada ish vaqti qanday belgilanadi — bir marta hammaga yoki har bir shifokor uchun alohida.",
+  "sch.mode_shared": "Hammaga bir xil",
+  "sch.mode_individual": "Har kimga alohida",
+  "sch.mode_shared_hint":
+    "Jadvalni siz tuzasiz — barcha shifokorlar shu ish vaqtida qabul qiladi.",
+  "sch.mode_individual_hint":
+    "Har bir shifokor o'z jadvalini o'zi tuzadi — siz uni faqat ko'rasiz.",
+  "sch.mode_saved": "Jadval rejimi yangilandi",
+  "sch.mode_failed": "Rejimni o'zgartirib bo'lmadi. Keyinroq urinib ko'ring.",
+  "sch.mode_unavailable": "Baza yangilanmagan: providers jadvalida schedule_mode ustuni yo'q.",
+  "sch.readonly": "Faqat ko'rish",
+  "sch.owner_readonly":
+    "Bu rejimda jadvalni har bir shifokor o'zi tuzadi. Siz uni faqat ko'rasiz — tahrirlash uchun rejimni \"Hammaga bir xil\" ga o'zgartiring.",
+  "sch.staff_readonly":
+    "Klinika jadvali hamma uchun bir xil — uni klinika rahbari belgilaydi. Siz uni faqat ko'rasiz.",
+  "sch.business_title": "Klinika jadvali",
+  "sch.card_desc_readonly":
+    "Yoqilgan kunlar va ularning ish vaqtlari — mijozlar aynan shu vaqtlarni ko'radi.",
+  "sch.more_shared_sub": "Klinika ish vaqti (faqat ko'rish)",
+  "sch.more_individual_sub": "Shifokorlar jadvalini ko'rish",
+
   // ── Biznes qo'shish ──
   "ab.title": "Biznes profili yaratish",
   "ab.edit_title": "Biznes profilini tahrirlash",
@@ -459,6 +483,12 @@ export const uz = {
   "ab.phone": "Biznes telefon raqami",
   "ab.photos": "Biznes rasmlari",
   "ab.location": "Joylashuv",
+
+  // ── Biznes profili — faqat ko'rish (klinika xodimi uchun) ──
+  "biz.view_title": "Biznes profili",
+  "biz.readonly_note": "Bu sahifa faqat ko'rish uchun — biznes ma'lumotlarini faqat biznes egasi tahrirlay oladi.",
+  "biz.readonly_sub": "Klinika ma'lumotlari — faqat ko'rish",
+  "biz.no_photos": "Rasm qo'shilmagan",
 
   // ── Xizmatlar (services) ──
   "dash.nav_services": "Xizmatlar",
@@ -495,6 +525,17 @@ export const uz = {
   "svc.free_price": "Narx kelishiladi",
   "svc.name_required": "Xizmat nomini kiriting",
   "svc.count": "{n} ta xizmat",
+  // Klinika: xizmatlarni har bir shifokor o'zi boshqaradi (services.worker_id)
+  "svc.my_title": "Mening xizmatlarim",
+  "svc.my_sub": "Siz ko'rsatadigan xizmatlar — mijoz sizga yozilganda shulardan tanlaydi.",
+  "svc.clinic_sub": "Xizmatlarni har bir shifokor o'zi qo'shadi — bu yerda ularni faqat ko'rasiz.",
+  "svc.clinic_note":
+    "Har bir shifokor o'z xizmatlarini o'z panelida qo'shadi va tahrirlaydi. \"Umumiy\" xizmatlar — hech kimga biriktirilmaganlari.",
+  "svc.group_common": "Umumiy",
+  "svc.staff_readonly": "Xizmatlar biznes darajasida boshqariladi — siz ularni faqat ko'rasiz.",
+  "svc.needs_column": "Baza yangilanmagan: services jadvalida worker_id ustuni yo'q. Shu ustun qo'shilsa, o'z xizmatlaringizni o'zingiz boshqarasiz.",
+  "svc.empty_clinic_desc":
+    "Hali birorta shifokor xizmat qo'shmagan. Ular buni o'z panelidagi \"Mening xizmatlarim\" bo'limidan qo'shadi.",
 
   // ── Restoran stollari ──
   "tbl.title": "Stollar",
@@ -853,6 +894,131 @@ export const uz = {
   "paycfg.percent_invalid": "Foiz 10 va 50 oralig'ida bo'lishi kerak.",
   "paycfg.saved": "Sozlamalar saqlandi",
   "paycfg.save_failed": "Saqlashda xatolik. Qayta urinib ko'ring.",
+
+  // ── Bo'limlar (shifoxona/klinika: Kardiologiya, Urologiya…) ──
+  "dep.nav": "Bo'limlar",
+  "dep.more_sub": "Kardiologiya, urologiya va boshqalar",
+  "dep.title": "Bo'limlar boshqaruvi",
+  "dep.sub": "Klinikangiz bo'limlari — shifokorlar va xizmatlar shularga biriktiriladi.",
+  "dep.add": "Bo'lim qo'shish",
+  "dep.edit": "Tahrirlash",
+  "dep.name": "Bo'lim nomi",
+  "dep.name_ph": "Masalan: Kardiologiya",
+  "dep.desc": "Tavsif",
+  "dep.desc_ph": "Bo'lim haqida qisqacha (ixtiyoriy)",
+  "dep.active": "Faol",
+  "dep.hidden": "Yashirilgan",
+  "dep.name_required": "Bo'lim nomini kiriting",
+  "dep.delete_q": "Bu bo'lim o'chirilsinmi?",
+  "dep.empty": "Hali bo'lim qo'shilmagan",
+  "dep.empty_desc": "Birinchi bo'limingizni qo'shing — shifokorlar va xizmatlar shunga biriktiriladi.",
+  "dep.unavailable": "Bo'limlar hali mavjud emas",
+  "dep.unavailable_desc": "Ma'lumotlar bazasi hali yangilanmagan. Keyinroq qayta urinib ko'ring.",
+  "dep.field": "Bo'lim",
+  "dep.pick": "Bo'lim tanlang",
+  "dep.none": "Bo'limsiz",
+
+  // ── Shifokorlar (klinika xodimlari) ──
+  "stf.nav": "Shifokorlar",
+  "stf.whose_schedule": "Kimning jadvali",
+  "stf.more_sub": "Shifokorlar va ularning bo'limlari",
+  "stf.title": "Shifokorlar boshqaruvi",
+  "stf.sub": "Shifokorlar ro'yxati — mijoz bron qilishda shulardan tanlaydi.",
+  "stf.add": "Shifokor qo'shish",
+  "stf.edit": "Tahrirlash",
+  "stf.name": "F.I.Sh.",
+  "stf.name_ph": "Masalan: Aliyev Alisher",
+  "stf.position": "Lavozim",
+  "stf.position_ph": "Masalan: Kardiolog, oliy toifa",
+  "stf.experience": "Tajriba (yil)",
+  "stf.experience_ph": "10",
+  "stf.years": "yil tajriba",
+  "stf.photo": "Surat (ixtiyoriy)",
+  "stf.photo_pick": "Surat tanlash",
+  "stf.img_too_big": "Surat hajmi 5 MB dan oshmasin",
+  "stf.active": "Faol",
+  "stf.hidden": "Yashirilgan",
+  "stf.name_required": "Shifokor F.I.Sh. ini kiriting",
+  "stf.dept_required": "Shifokor uchun bo'lim tanlang",
+  "dep.has_staff": "Bu bo'limda shifokorlar bor — avval ularni boshqa bo'limga ko'chiring yoki o'chiring",
+  "stf.need_dept": "Avval bo'lim yarating",
+  "stf.need_dept_desc": "Shifokor albatta bo'limga (masalan, Kardiologiya) biriktiriladi. Avval kamida bitta bo'lim qo'shing.",
+  "stf.delete_q": "Bu shifokor o'chirilsinmi?",
+  "stf.empty": "Hali shifokor qo'shilmagan",
+  "stf.empty_desc": "Birinchi shifokoringizni qo'shing — mijozlar uni bron qilishda ko'radi.",
+  "stf.unavailable": "Shifokorlar hali mavjud emas",
+  "stf.unavailable_desc": "Ma'lumotlar bazasi hali yangilanmagan. Keyinroq qayta urinib ko'ring.",
+  "stf.count": "{n} ta shifokor",
+  "stf.doctor": "Shifokor",
+  "stf.need_staff": "Avval shifokor qo'shing",
+  "stf.need_staff_desc":
+    "Bu rejimda jadvalni har bir shifokor o'zi tuzadi. Kamida bitta shifokor qo'shing — uning jadvalini shu yerda ko'rasiz.",
+
+  // ── Klinika xodimi (shifokor akkaunti) ──
+  "stf.my_schedule": "Mening jadvalim",
+  "stf.my_schedule_sub": "O'z ish vaqtlaringiz va tanaffuslaringiz",
+  "stf.my_stats": "Mening statistikam",
+  "stf.my_stats_sub": "O'z bronlaringiz bo'yicha tahlil",
+  "stf.my_stats_note": "Faqat sizga tegishli bronlar hisobga olingan",
+  "stf.staff_at": "{name} — xodim",
+  "stf.logout_sub": "Hisobdan chiqish",
+
+  // ── Taklif (kirish) kodlari ──
+  "inv.action": "Kirish kodi",
+  "inv.linked": "Bog'langan",
+  "inv.email_label": "Shifokor emaili (ixtiyoriy)",
+  "inv.email_ph": "shifokor@example.com",
+  "inv.email_hint":
+    "Emailni kiritsangiz, shifokor mavjud Vaqtda hisobi bilan ham panelga kira oladi.",
+  "inv.generate": "Kod olish",
+  "inv.regenerate": "Yangi kod",
+  "inv.code_label": "Kirish kodi",
+  "inv.code_hint": "Shifokor provayder ilovasiga kirib shu kodni kiritadi.",
+  "inv.code_note": "Kod bir marta ishlaydi va 14 kundan keyin muddati tugaydi.",
+  "inv.share": "Ulashish",
+  "inv.share_msg":
+    "Vaqtda Provider ilovasiga kiring va \"Klinikaga qo'shilish\" bo'limida shu kodni kiriting: {code}",
+  "inv.gate_link": "Klinikada ishlaysizmi? Kirish kodini kiriting",
+  "inv.join_title": "Klinikaga qo'shilish",
+  "inv.join_sub": "Klinika rahbari bergan 8 belgili kodni kiriting.",
+  "inv.join_hint":
+    "Kod to'g'ri bo'lsa, siz shu klinikaning shifokori sifatida ulanasiz: o'z jadvalingiz va o'z bemorlaringizni ko'rasiz.",
+  "inv.code_ph": "AB3K7M9P",
+  "inv.submit": "Qo'shilish",
+  "inv.joined": "Siz klinikaga bog'landingiz",
+  "inv.unavailable": "Kirish kodlari hali ishlamaydi. Keyinroq urinib ko'ring.",
+  "inv.err_len": "Kod 8 ta belgidan iborat bo'lishi kerak",
+  "inv.err_invalid": "Bunday kod topilmadi. Kodni tekshirib qayta kiriting.",
+  "inv.err_used": "Bu kod allaqachon ishlatilgan. Rahbardan yangi kod so'rang.",
+  "inv.err_expired": "Kod muddati tugagan. Rahbardan yangi kod so'rang.",
+  "inv.err_already_staff": "Siz bu klinikaga allaqachon bog'langansiz",
+  "inv.err_forbidden": "Bu shifokorga kod berishga ruxsatingiz yo'q",
+  "inv.err_not_found": "Shifokor topilmadi",
+  "inv.err_already_linked": "Bu shifokorning akkaunti allaqachon bog'langan",
+  "inv.err_unauthorized": "Avval hisobingizga kiring",
+  "inv.err_failed": "Xatolik yuz berdi. Qayta urinib ko'ring.",
+
+  // ── Shifokor logini va paroli (worker_credentials) ──
+  "wlg.login": "Login:",
+  "wlg.password": "Parol:",
+  "wlg.show": "Parolni ko'rsatish",
+  "wlg.hide": "Parolni yashirish",
+  "wlg.hint": "Shifokor Vaqtda Provider ilovasiga shu login va parol bilan kiradi.",
+  "wlg.share": "Ulashish",
+  "wlg.share_msg": "Vaqtda Provider ilovasiga kirish\nLogin: {login}\nParol: {password}",
+  "wlg.create": "Login yaratish",
+  "wlg.create_hint": "Shifokorga alohida login va parol yarating — u shu ma'lumotlar bilan kiradi.",
+  "wlg.created": "Login yaratildi",
+  "wlg.existing": "Bu shifokorda login allaqachon bor",
+  "wlg.reset": "Yangi parol",
+  "wlg.reset_q": "Yangilansinmi?",
+  "wlg.reset_done": "Yangi parol tayyor",
+  "wlg.unavailable": "Login yaratish hali ishlamaydi. Keyinroq urinib ko'ring.",
+  "wlg.err_forbidden": "Bu shifokorga login berishga ruxsatingiz yo'q",
+  "wlg.err_not_found": "Shifokor topilmadi",
+  "wlg.err_pgcrypto":
+    "Ma'lumotlar bazasida pgcrypto kengaytmasi yoqilmagan — administratorga murojaat qiling.",
+  "wlg.err_failed": "Xatolik yuz berdi. Qayta urinib ko'ring.",
 
   // ── 404 ──
   "nf.title": "Sahifa topilmadi",

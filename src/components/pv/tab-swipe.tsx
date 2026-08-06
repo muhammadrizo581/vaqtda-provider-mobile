@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import React from "react";
 import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+import { useStaffRoleContext } from "@/context/StaffRoleContext";
 
 // Tartib (tabs)/_layout.tsx dagi triggerlar bilan bir xil bo'lishi shart
 const TABS = ["/", "/appointments", "/chat", "/waitlist", "/more"] as const;
@@ -12,10 +13,13 @@ export type TabPath = (typeof TABS)[number];
 
 export function TabSwipe({ tab, children }: { tab: TabPath; children: React.ReactNode }) {
   const router = useRouter();
-  const idx = TABS.indexOf(tab);
+  const { isStaff } = useStaffRoleContext();
+  // Shifokorda Navbat tabi yashirin — surish ham unga tushib qolmasin
+  const tabs: readonly TabPath[] = isStaff ? TABS.filter((x) => x !== "/waitlist") : TABS;
+  const idx = tabs.indexOf(tab);
 
   const go = (dir: 1 | -1) => {
-    const next = TABS[idx + dir];
+    const next = tabs[idx + dir];
     if (next !== undefined) router.navigate(next);
   };
 

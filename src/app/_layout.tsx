@@ -14,6 +14,7 @@ import { VaqtdaSplash } from "@/components/vaqtda-splash";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { ProviderProvider } from "@/context/ProviderContext";
+import { StaffRoleProvider } from "@/context/StaffRoleContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 
 SplashScreen.preventAutoHideAsync();
@@ -28,8 +29,13 @@ function RootNavigator() {
     SplashScreen.hideAsync();
   }, []);
 
-  const isProvider = isAuthenticated && user?.role === "provider";
+  // Panelga KIRISH huquqi AuthContext'da tekshiriladi (provayder roli, biznes
+  // egaligi YOKI provider_staff a'zoligi) — ruxsati yo'q sessiya u yerda yopiladi.
+  // Bu yerda faqat QAYSI panel ochilishi hal qilinadi:
+  //   role === "worker"  → (worker) — usta/shifokorning o'z paneli
+  //   qolgani (provider/admin) → (tabs) — biznes egasining paneli
   const isWorker = isAuthenticated && user?.role === "worker";
+  const isProvider = isAuthenticated && !isWorker;
   const showOverlay = loading || !introDone;
 
   return (
@@ -48,9 +54,15 @@ function RootNavigator() {
             <Stack.Screen name="settings" />
             <Stack.Screen name="schedule" />
             <Stack.Screen name="services" />
+            {/* Sartaroshxona kabi bizneslar — ustalar */}
             <Stack.Screen name="workers" />
+            {/* Shifoxona/klinika — bo'limlar va shifokorlar */}
+            <Stack.Screen name="departments" />
+            <Stack.Screen name="staff" />
             <Stack.Screen name="menu" />
             <Stack.Screen name="business-profile" />
+            {/* Shifokor taklif kodini kiritib klinikaga bog'lanadi */}
+            <Stack.Screen name="join-clinic" />
             <Stack.Screen name="cards" />
             <Stack.Screen name="payment-settings" />
             <Stack.Screen name="chat/[id]" />
@@ -106,11 +118,15 @@ export default function RootLayout() {
         <ThemeProvider>
           <LanguageProvider>
             <AuthProvider>
-              <ProviderProvider>
-                <ToastProvider>
-                  <ThemedApp />
-                </ToastProvider>
-              </ProviderProvider>
+              {/* Rol (ega/xodim) provayder profilidan OLDIN aniqlanadi —
+                  xodim uchun profil uning klinikasi bo'yicha yuklanadi */}
+              <StaffRoleProvider>
+                <ProviderProvider>
+                  <ToastProvider>
+                    <ThemedApp />
+                  </ToastProvider>
+                </ProviderProvider>
+              </StaffRoleProvider>
             </AuthProvider>
           </LanguageProvider>
         </ThemeProvider>

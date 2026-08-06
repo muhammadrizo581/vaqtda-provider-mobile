@@ -28,7 +28,8 @@ export interface Appointment {
   table_id: string | null;
   date_to: string | null; // YYYY-MM-DD
   table_name: string | null;
-  // Sartaroshxona: bron qaysi ustaga (provider_staff) belgilangan
+  // Bron qaysi xodimga (provider_staff) belgilangan —
+  // sartaroshxonada usta, klinikada shifokor
   staff_id: string | null;
   staff_name: string | null;
   // Shu bron uchun allaqachon to'langan summa (oldindan to'lov + qolgani).
@@ -60,7 +61,19 @@ export function useAppointments() {
         .order("booking_date", { ascending: false })
         .order("start_time", { ascending: false });
       if (err) {
-        // table_id/date_to/staff_id ustunlari bo'lmasa — eski ustunlar bilan qayta so'raymiz
+        // staff_id ustuni hali qo'shilmagan bo'lsa — usiz qayta so'raymiz
+        const noStaff = await supabase
+          .from("bookings")
+          .select(`${BASE_COLS}, table_id, date_to, services(name)`)
+          .eq("provider_id", providerId)
+          .order("booking_date", { ascending: false })
+          .order("start_time", { ascending: false });
+        bookings = noStaff.data as any;
+        err = noStaff.error;
+      }
+      if (err) {
+        // table_id/date_to ustunlari hali qo'shilmagan bo'lsa (SQL ishga
+        // tushirilmagan) — eski ustunlar bilan qayta so'raymiz
         const legacy = await supabase
           .from("bookings")
           .select(`${BASE_COLS}, services(name)`)
@@ -94,15 +107,16 @@ export function useAppointments() {
         tableNames = Object.fromEntries((tbls || []).map((x: any) => [x.id, x.name]));
       }
 
-      // Ustalar nomlari (staff_id bo'lgan bronlar uchun — sartaroshxona)
+      // Xodimlar (usta/shifokor) ismlari — staff_id bo'lgan bronlar uchun.
+      // Jadval hali yaratilmagan bo'lsa — bo'sh qoladi, qatorda ko'rsatilmaydi.
       const staffIds = [...new Set((bookings || []).map((b: any) => b.staff_id).filter(Boolean))];
       let staffNames: Record<string, string> = {};
       if (staffIds.length > 0) {
-        const { data: ws } = await supabase
+        const { data: stf } = await supabase
           .from("provider_staff")
           .select("id, full_name")
           .in("id", staffIds);
-        staffNames = Object.fromEntries((ws || []).map((x: any) => [x.id, x.full_name]));
+        staffNames = Object.fromEntries((stf || []).map((x: any) => [x.id, x.full_name]));
       }
 
       // Har bron uchun to'langan summa (payments 'paid') — qolgan summani hisoblash uchun
@@ -191,7 +205,7 @@ export function useAppointments() {
           paid_at: new Date().toISOString(),
         });
         if (payErr) return false;
-        // Bron to'liq to'landi deб belgilaymiz (mijoz ilovasi uchun izchillik)
+        // Bron to'liq to'landi deb belgilaymiz (mijoz ilovasi uchun izchillik)
         await supabase.from("bookings").update({ payment_status: "paid" }).eq("id", id);
       }
       const ok = await act(id, "complete");

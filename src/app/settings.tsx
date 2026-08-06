@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors, useTheme, type ThemeMode } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
+import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { localize } from "@/utils/localize";
 
 export default function SettingsScreen() {
@@ -20,6 +21,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user, logout } = useAuth();
   const { provider } = useProvider();
+  const { isStaff } = useStaffRoleContext();
   const { t, lang, setLang } = useLanguage();
   const { mode, setMode } = useTheme();
 
@@ -189,14 +191,14 @@ export default function SettingsScreen() {
         </View>
       </Card>
 
-      {/* Biznes profil */}
+      {/* Biznes profil — ega tahrirlaydi, klinika xodimi esa faqat ko'radi */}
       <Pressable onPress={() => router.push("/business-profile")}>
         <Card style={styles.menuRow}>
           <View style={styles.menuIcon}>
             <Store size={18} color={colors.primary} />
           </View>
           <Text style={styles.menuText}>
-            {provider ? t("ab.edit_title") : t("tt.create_business")}
+            {isStaff ? t("biz.view_title") : provider ? t("ab.edit_title") : t("tt.create_business")}
           </Text>
           <ChevronRight size={18} color={colors.onSurfaceVariant} />
         </Card>

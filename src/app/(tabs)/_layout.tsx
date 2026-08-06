@@ -2,10 +2,14 @@
 // 5 bo'lim: Boshqaruv, Bronlar, Chat, Navbat, Boshqa (Jadval/Xizmatlar/Statistika shu yerda).
 // Diqqat: iPhone'da 5 tadan ko'p trigger tizimning xunuk "More" ekranini ochadi —
 // shuning uchun qolgan bo'limlar o'zimizning "Boshqa" ekranidan ochiladi.
+//
+// Klinika xodimi (shifokor) uchun panel cheklangan: Navbat (waitlist) butun
+// biznesga tegishli bo'lgani uchun yashiriladi, qolganlari o'z ma'lumoti bilan.
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Badge, Icon, Label, NativeTabs, VectorIcon } from "expo-router/unstable-native-tabs";
 import React from "react";
 import { useLanguage } from "@/context/LanguageContext";
+import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { useColors } from "@/context/ThemeContext";
 import { useChatUnread } from "@/hooks/useChatUnread";
 
@@ -13,6 +17,7 @@ export default function TabsLayout() {
   const { t } = useLanguage();
   const colors = useColors();
   const chatUnread = useChatUnread();
+  const { isStaff } = useStaffRoleContext();
 
   return (
     <NativeTabs tintColor={colors.primary}>
@@ -35,7 +40,8 @@ export default function TabsLayout() {
         <Label>{t("pv.nav_chat")}</Label>
         {chatUnread > 0 && <Badge>{chatUnread > 99 ? "99+" : String(chatUnread)}</Badge>}
       </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="waitlist">
+      {/* Navbat — butun biznes bo'yicha; shifokorga ko'rsatilmaydi */}
+      <NativeTabs.Trigger name="waitlist" hidden={isStaff}>
         <Icon sf="hourglass" androidSrc={<VectorIcon family={MaterialIcons} name="hourglass-empty" />} />
         <Label>{t("pv.nav_waitlist")}</Label>
       </NativeTabs.Trigger>

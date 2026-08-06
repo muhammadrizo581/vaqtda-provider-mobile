@@ -43,15 +43,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const fullName = profile?.full_name || "";
       const avatarUrl = profile?.avatar_url || null;
       const dbRole = (profile?.role || "client").toLowerCase();
+
+      // Rol aniqlash tartibi:
+      //   1) profiles.role = admin / provider / specialist / partner → provayder
+      //   2) providers.user_id — biznes EGASI (rol sinxronlanmagan bo'lsa ham)
+      //   3) provider_staff.user_id — USTA/SHIFOKOR (user_role enumida 'worker' yo'q,
+      //      shuning uchun a'zolik orqali aniqlanadi)
+      //   4) can_access_provider_panel() — emailiga taklif yuborilgan xodim
+      //   5) aks holda — client (panelga kirmaydi)
       let role: string;
       if (dbRole === "admin") {
         role = "admin";
       } else if (dbRole === "provider" || dbRole === "specialist" || dbRole === "partner") {
         role = "provider";
       } else {
-        // profiles.role 'provider' emas — lekin foydalanuvchi biznes EGASI bo'lishi
-        // mumkin (rol sinxronlanmagan, masalan mobil'da biznes yaratilganda). Shu
-        // holatda ham provayder deb hisoblaymiz — aks holda o'z akkauntiga kira olmaydi.
         const { data: ownProvider } = await supabase
           .from("providers")
           .select("id")
@@ -60,19 +65,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (ownProvider) {
           role = "provider";
         } else {
-          // Provayder emas — USTA (staff) bo'lishi mumkin. user_role enumida 'worker'
-          // yo'q, shuning uchun usta provider_staff a'zoligi orqali aniqlanadi.
           const { data: staff } = await supabase
             .from("provider_staff")
             .select("id")
             .eq("user_id", userId)
             .maybeSingle();
-          role = staff ? "worker" : "client";
+          if (staff) {
+            role = "worker";
+          } else {
+            // Hali user_id biriktirilmagan, lekin emailiga taklif yuborilgan xodim
+            const { data: canAccess } = await supabase.rpc("can_access_provider_panel");
+            role = canAccess === true ? "worker" : "client";
+          }
         }
       }
 
-      if (role !== "provider" && role !== "worker") {
-        // Provayder yoki usta bo'lmagan akkaunt panelga kirmaydi — sessiya jimgina yopiladi.
+      if (role !== "provider" && role !== "worker" && role !== "admin") {
+        // Ruxsati yo'q akkaunt panelga kirmaydi — sessiya jimgina yopiladi.
         // setTimeout: onAuthStateChange callback ichida auth metodini chaqirish deadlock beradi.
         setUser(null);
         setIsAuthenticated(false);
@@ -131,25 +140,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let email = identifier.trim();
     if (!email.includes("@")) {
       const { data: resolved } = await supabase.rpc("email_for_username", { uname: email });
-      if (!resolved) return { error: "invalid_credentials" };
-      email = resolved as string;
+      let target = (resolved as string | null) || null;
+      if (!target) {
+        // Klinika xodimi logini (masalan "akfa-medline.ali-qosimov") —
+        // biznes egasi yaratgan akkaunt, worker_credentials jadvalida
+        const { data: workerEmail } = await supabase.rpc("worker_email_for_username", {
+          p_login: email,
+        });
+        target = (workerEmail as string | null) || null;
+      }
+      if (!target) return { error: "invalid_credentials" };
+      email = target;
     }
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
 
-    // Rol tekshiruvi: provayder yoki usta (worker) bo'lmasa sessiya yopiladi va
-    // xato matni parol xatosidan farq qilmaydi — rol haqida hech narsa oshkor qilinmaydi.
+    // Ruxsat tekshiruvi: provayder / biznes egasi / usta (provider_staff) yoki
+    // taklif qilingan xodim bo'lmasa sessiya yopiladi va xato matni parol
+    // xatosidan farq qilmaydi — rol haqida hech narsa oshkor qilinmaydi.
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", data.user.id)
       .maybeSingle();
     const dbRole = (profile?.role || "client").toLowerCase();
-    const isProvider = dbRole === "provider" || dbRole === "specialist" || dbRole === "partner";
-    // Provayder emas — biznes egasi (providers) yoki usta (provider_staff) bo'lishi
-    // mumkin: rol sinxronlanmagan bo'lsa ham o'z akkauntiga kira olsin.
-    let allowed = isProvider;
+
+    let allowed =
+      dbRole === "admin" ||
+      dbRole === "provider" ||
+      dbRole === "specialist" ||
+      dbRole === "partner";
+
     if (!allowed) {
+      // Rol sinxronlanmagan bo'lsa ham biznes egasi o'z akkauntiga kira olsin
       const { data: ownProvider } = await supabase
         .from("providers")
         .select("id")
@@ -165,6 +188,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
       allowed = !!staff;
     }
+    if (!allowed) {
+      // Emailiga taklif yuborilgan, lekin hali biriktirilmagan xodim
+      const { data: canAccess } = await supabase.rpc("can_access_provider_panel");
+      allowed = canAccess === true;
+    }
+
     if (!allowed) {
       await supabase.auth.signOut();
       return { error: "invalid_credentials" };
