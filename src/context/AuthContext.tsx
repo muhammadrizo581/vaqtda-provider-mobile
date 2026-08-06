@@ -43,15 +43,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const fullName = profile?.full_name || "";
       const avatarUrl = profile?.avatar_url || null;
       const dbRole = (profile?.role || "client").toLowerCase();
-      const role =
-        dbRole === "admin"
-          ? "admin"
-          : dbRole === "provider" || dbRole === "specialist" || dbRole === "partner"
-            ? "provider"
-            : "client";
+      let role: string;
+      if (dbRole === "admin") {
+        role = "admin";
+      } else if (dbRole === "provider" || dbRole === "specialist" || dbRole === "partner") {
+        role = "provider";
+      } else {
+        // profiles.role 'provider' emas — lekin foydalanuvchi biznes EGASI bo'lishi
+        // mumkin (rol sinxronlanmagan, masalan mobil'da biznes yaratilganda). Shu
+        // holatda ham provayder deb hisoblaymiz — aks holda o'z akkauntiga kira olmaydi.
+        const { data: ownProvider } = await supabase
+          .from("providers")
+          .select("id")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (ownProvider) {
+          role = "provider";
+        } else {
+          // Provayder emas — USTA (staff) bo'lishi mumkin. user_role enumida 'worker'
+          // yo'q, shuning uchun usta provider_staff a'zoligi orqali aniqlanadi.
+          const { data: staff } = await supabase
+            .from("provider_staff")
+            .select("id")
+            .eq("user_id", userId)
+            .maybeSingle();
+          role = staff ? "worker" : "client";
+        }
+      }
 
-      if (role !== "provider") {
-        // Provayder bo'lmagan akkaunt panelga kirmaydi — sessiya jimgina yopiladi.
+      if (role !== "provider" && role !== "worker") {
+        // Provayder yoki usta bo'lmagan akkaunt panelga kirmaydi — sessiya jimgina yopiladi.
         // setTimeout: onAuthStateChange callback ichida auth metodini chaqirish deadlock beradi.
         setUser(null);
         setIsAuthenticated(false);
@@ -116,8 +137,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
 
-    // Rol tekshiruvi: provayder bo'lmasa sessiya yopiladi va xato matni
-    // parol xatosidan farq qilmaydi — rol haqida hech narsa oshkor qilinmaydi.
+    // Rol tekshiruvi: provayder yoki usta (worker) bo'lmasa sessiya yopiladi va
+    // xato matni parol xatosidan farq qilmaydi — rol haqida hech narsa oshkor qilinmaydi.
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
@@ -125,7 +146,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .maybeSingle();
     const dbRole = (profile?.role || "client").toLowerCase();
     const isProvider = dbRole === "provider" || dbRole === "specialist" || dbRole === "partner";
-    if (!isProvider) {
+    // Provayder emas — biznes egasi (providers) yoki usta (provider_staff) bo'lishi
+    // mumkin: rol sinxronlanmagan bo'lsa ham o'z akkauntiga kira olsin.
+    let allowed = isProvider;
+    if (!allowed) {
+      const { data: ownProvider } = await supabase
+        .from("providers")
+        .select("id")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+      allowed = !!ownProvider;
+    }
+    if (!allowed) {
+      const { data: staff } = await supabase
+        .from("provider_staff")
+        .select("id")
+        .eq("user_id", data.user.id)
+        .maybeSingle();
+      allowed = !!staff;
+    }
+    if (!allowed) {
       await supabase.auth.signOut();
       return { error: "invalid_credentials" };
     }

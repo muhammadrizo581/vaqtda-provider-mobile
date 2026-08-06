@@ -1,5 +1,5 @@
 // Bronlar — saytdagi app/dashboard/appointments/page.tsx dan port.
-import { CalendarDays, CheckCircle2, Phone, Search, X } from "lucide-react-native";
+import { CalendarDays, CheckCircle2, Phone, Scissors, Search, X } from "lucide-react-native";
 import React, { useMemo, useRef, useState } from "react";
 import {
   Alert,
@@ -14,6 +14,7 @@ import {
 import { AnimatedLogo } from "@/components/animated-logo";
 import { BusinessGate } from "@/components/pv/business-gate";
 import { Screen } from "@/components/pv/screen";
+import { SettleModal } from "@/components/pv/settle-modal";
 import {
   Card,
   ClientAvatar,
@@ -105,7 +106,7 @@ function AppointmentsContent() {
   const colors = useColors();
   const styles = useStyles();
   const { t, lang } = useLanguage();
-  const { appointments, loading, reload, act } = useAppointments();
+  const { appointments, loading, reload, act, settleCashAndComplete } = useAppointments();
   const today = tashkentClock.now().dateStr;
   const tomorrow = addDaysStr(today, 1);
 
@@ -113,6 +114,8 @@ function AppointmentsContent() {
   const [dayFilter, setDayFilter] = useState<string>(today);
   const [query, setQuery] = useState("");
   const [actingId, setActingId] = useState<string | null>(null);
+  // Yakunlashda qolgan summa bo'lsa chiqadigan to'lov modali
+  const [settleFor, setSettleFor] = useState<Appointment | null>(null);
   const dayScrollRef = useRef<ScrollView>(null);
   const todayTabX = useRef(0);
 
@@ -203,8 +206,36 @@ function AppointmentsContent() {
         { text: t("common.confirm"), style: "destructive", onPress: run },
       ]);
     } else {
-      run();
+      // Yakunlash: qolgan summa bo'lsa (narx > to'langan) — to'lov modalini ochamiz,
+      // aks holda to'g'ridan-to'g'ri yakunlaymiz.
+      const remaining = Math.max(0, (a.price || 0) - a.paid_amount);
+      if (remaining > 0) {
+        setSettleFor(a);
+      } else {
+        run();
+      }
     }
+  };
+
+  // Modaldagi "Naqd qabul qilindi" — qolgan summani cash yozib bandlikni yopadi
+  const handleSettleCash = async () => {
+    if (!settleFor) return;
+    const remaining = Math.max(0, (settleFor.price || 0) - settleFor.paid_amount);
+    setActingId(settleFor.id);
+    const ok = await settleCashAndComplete(settleFor.id, remaining, settleFor.client_id);
+    setActingId(null);
+    setSettleFor(null);
+    if (!ok) Alert.alert(t("pv.act_failed"));
+  };
+
+  // Click QR orqali qolgan summa to'langach — remainder payment webhook tomonidan
+  // yozilgan, biz faqat bandlikni yakunlaymiz.
+  const handleSettleOnlinePaid = async () => {
+    if (!settleFor) return;
+    const ok = await act(settleFor.id, "complete");
+    setSettleFor(null);
+    reload(); // paid_amount/statuslarni bazadan yangilaymiz
+    if (!ok) Alert.alert(t("pv.act_failed"));
   };
 
   return (
@@ -386,6 +417,14 @@ function AppointmentsContent() {
                               : ""}
                           {a.price != null ? ` · ${formatSom(a.price)}` : ""}
                         </Text>
+                        {a.staff_name ? (
+                          <View style={styles.workerRow}>
+                            <Scissors size={12} color={colors.primary} />
+                            <Text style={styles.workerText} numberOfLines={1}>
+                              {a.staff_name}
+                            </Text>
+                          </View>
+                        ) : null}
                         {a.client?.phone ? (
                           <Pressable
                             onPress={() => Linking.openURL(`tel:${a.client!.phone}`)}
@@ -432,6 +471,18 @@ function AppointmentsContent() {
           </Card>
         ))
       )}
+
+      {/* To'lov modali — yakunlashda qolgan summa bo'lsa */}
+      <SettleModal
+        visible={settleFor !== null}
+        onClose={() => setSettleFor(null)}
+        bookingId={settleFor?.id ?? null}
+        total={settleFor?.price || 0}
+        paid={settleFor?.paid_amount || 0}
+        clientName={settleFor?.client?.full_name}
+        onCash={handleSettleCash}
+        onOnlinePaid={handleSettleOnlinePaid}
+      />
     </Screen>
   );
 }
@@ -549,6 +600,8 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   service: { fontSize: 12, color: colors.onSurfaceVariant, marginTop: 2 },
   phoneRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3, alignSelf: "flex-start" },
   phoneText: { fontSize: 12, color: colors.secondary },
+  workerRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 3, alignSelf: "flex-start" },
+  workerText: { fontSize: 12, fontWeight: "600", color: colors.primary },
   notes: { fontSize: 12, color: alpha(colors.onSurfaceVariant, 0.8), marginTop: 4, fontStyle: "italic" },
   actions: { flexDirection: "row", gap: 8 },
 }));

@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Trophy,
   Users,
+  Wallet,
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -32,6 +33,7 @@ import { useProvider } from "@/context/ProviderContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useAppointments, type Appointment } from "@/hooks/useAppointments";
 import { useWaitlistEntries } from "@/hooks/useWaitlistEntries";
+import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/lib/supabase";
 import { formatSom } from "@/utils/price";
 import { addDaysStr, createTashkentClock, formatUzDate } from "@/utils/tashkent";
@@ -162,6 +164,7 @@ function OverviewContent() {
   const { t } = useLanguage();
   const { appointments, loading, reload } = useAppointments();
   const { entries: waitlist, reload: reloadWaitlist } = useWaitlistEntries();
+  const { wallet, reload: reloadWallet } = useWallet();
   const router = useRouter();
 
   const now = tashkentClock.now();
@@ -312,6 +315,7 @@ function OverviewContent() {
       onRefresh={() => {
         reload();
         reloadWaitlist();
+        reloadWallet();
       }}
     >
       {/* Sarlavha + tezkor tugmalar */}
@@ -369,6 +373,38 @@ function OverviewContent() {
           </View>
         </GlassSurface>
       </View>
+
+      {/* Hisobim — ichki hisob raqam + yig'ilgan summa (wallet) */}
+      {wallet?.account_number ? (
+        <GlassSurface style={styles.walletCard} fallbackStyle={styles.walletFallback}>
+          <View style={styles.walletTopRow}>
+            <View style={styles.walletIcon}>
+              <Wallet size={16} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.walletLabel}>{t("wallet.title")}</Text>
+              <Text style={styles.walletAccount} numberOfLines={1}>
+                {wallet.account_number}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.walletValueRow}>
+            <Text style={styles.walletValue} numberOfLines={1} adjustsFontSizeToFit>
+              {wallet.earned_total > 0 ? formatSom(wallet.earned_total) : "0"}
+            </Text>
+            <Text style={styles.walletSuffix}>{t("pv.som")}</Text>
+          </View>
+          <View style={styles.walletMetaRow}>
+            <Text style={styles.walletMeta}>
+              {t("wallet.online")}: {formatSom(wallet.online_collected) || "0"}
+            </Text>
+            <View style={styles.walletMetaDot} />
+            <Text style={styles.walletMeta}>
+              {t("wallet.cash")}: {formatSom(wallet.cash_collected) || "0"}
+            </Text>
+          </View>
+        </GlassSurface>
+      ) : null}
 
       {/* ── Statistika ── Spinner faqat birinchi yuklanishda; refresh'da tepadagi logo yetadi */}
       {loading && appointments.length === 0 ? (
@@ -665,6 +701,51 @@ const useStyles = makeThemedStyles((colors) =>
 
     apptName: { fontWeight: "600", fontSize: 14, color: colors.onSurface },
     apptService: { fontSize: 12, color: colors.onSurfaceVariant, marginTop: 1 },
+
+    // Hisobim (wallet) bloki
+    walletCard: { borderRadius: radius.xl, padding: 16, overflow: "hidden", gap: 10 },
+    walletFallback: {
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    walletTopRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+    walletIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: radius.md,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: alpha(colors.primaryContainer, 0.16),
+    },
+    walletLabel: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: colors.onSurfaceVariant,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+    },
+    walletAccount: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: colors.onSurface,
+      letterSpacing: 1,
+      fontVariant: ["tabular-nums"],
+      marginTop: 1,
+    },
+    walletValueRow: { flexDirection: "row", alignItems: "baseline", gap: 6 },
+    walletValue: {
+      fontSize: 26,
+      fontWeight: "800",
+      color: colors.primary,
+      letterSpacing: -0.6,
+      fontVariant: ["tabular-nums"],
+      flexShrink: 1,
+    },
+    walletSuffix: { fontSize: 13, fontWeight: "700", color: colors.onSurfaceVariant },
+    walletMetaRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    walletMeta: { fontSize: 12, color: colors.onSurfaceVariant, fontWeight: "500" },
+    walletMetaDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.outlineVariant },
 
     sectionRow: {
       flexDirection: "row",

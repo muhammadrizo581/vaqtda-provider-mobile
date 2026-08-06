@@ -29,6 +29,7 @@ function RootNavigator() {
   }, []);
 
   const isProvider = isAuthenticated && user?.role === "provider";
+  const isWorker = isAuthenticated && user?.role === "worker";
   const showOverlay = loading || !introDone;
 
   return (
@@ -47,13 +48,17 @@ function RootNavigator() {
             <Stack.Screen name="settings" />
             <Stack.Screen name="schedule" />
             <Stack.Screen name="services" />
+            <Stack.Screen name="workers" />
             <Stack.Screen name="menu" />
             <Stack.Screen name="business-profile" />
             <Stack.Screen name="cards" />
             <Stack.Screen name="payment-settings" />
             <Stack.Screen name="chat/[id]" />
           </Stack.Protected>
-          <Stack.Protected guard={!isProvider}>
+          <Stack.Protected guard={isWorker}>
+            <Stack.Screen name="(worker)" />
+          </Stack.Protected>
+          <Stack.Protected guard={!isProvider && !isWorker}>
             <Stack.Screen name="login" />
           </Stack.Protected>
         </Stack>

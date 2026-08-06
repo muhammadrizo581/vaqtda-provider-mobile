@@ -16,12 +16,16 @@ export interface ProviderProfile {
   reviews_count: number;
   status: string; // pending | approved | ...
   is_active: boolean;
+  // Ustalar o'z narxini belgilaydimi (workers.tsx tugmasi)
+  staff_sets_own_price?: boolean;
   phone_number?: string | null;
   region_id?: string | null;
   // To'lov sozlamalari (payment-settings sahifasi boshqaradi)
   prepayment_type?: "none" | "percent" | "fixed" | "full" | null;
   prepayment_percent?: number | null;
   prepayment_amount?: number | null;
+  // Ichki hisob raqam (wallet) — tolov-hisob.sql beradi
+  account_number?: string | null;
 }
 
 export function useProviderProfile() {

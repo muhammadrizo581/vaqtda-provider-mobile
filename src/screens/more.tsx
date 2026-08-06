@@ -12,6 +12,7 @@ import {
   Settings,
   Store,
   Tag,
+  Users,
   UtensilsCrossed,
   Wallet,
   type LucideIcon,
@@ -40,7 +41,7 @@ export default function MoreScreen() {
   const tones = useToneColors();
   const styles = useStyles();
   const { t } = useLanguage();
-  const { mode, unit } = useBookingMode();
+  const { mode, unit, hasWorkers } = useBookingMode();
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
 
@@ -84,6 +85,19 @@ export default function MoreScreen() {
       href: "/services" as Href,
       tone: "secondary",
     },
+    // Ustalar (sartaroshxona kabi uses_staff bizneslar): usta qo'shish + login yaratish
+    ...(hasWorkers
+      ? [
+          {
+            key: "workers",
+            icon: Users,
+            title: t("pv.nav_workers"),
+            subtitle: t("pv.more_workers_sub"),
+            href: "/workers" as Href,
+            tone: "tertiary" as Tone,
+          },
+        ]
+      : []),
     // Restoran (stol rejimi): menyu — mijoz stol bron qilishda oldindan buyurtma qiladi
     ...(mode === "table" && unit === "table"
       ? [

@@ -10,11 +10,18 @@ import { supabase } from "@/lib/supabase";
 export type BookingMode = "slots" | "table" | "daily";
 export type TableUnit = "table" | "computer";
 
-export function useBookingMode(): { mode: BookingMode; unit: TableUnit; loading: boolean } {
+// hasWorkers — kategoriyada ustalar (workerlar) bo'ladimi (hozircha sartaroshxona).
+export function useBookingMode(): {
+  mode: BookingMode;
+  unit: TableUnit;
+  hasWorkers: boolean;
+  loading: boolean;
+} {
   const { provider } = useProvider();
   const categoryId = provider?.category_id;
   const [mode, setMode] = useState<BookingMode>("slots");
   const [unit, setUnit] = useState<TableUnit>("table");
+  const [hasWorkers, setHasWorkers] = useState(false);
   const [loading, setLoading] = useState(!!categoryId);
 
   useEffect(() => {
@@ -23,7 +30,7 @@ export function useBookingMode(): { mode: BookingMode; unit: TableUnit; loading:
     // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
     const timer = setTimeout(async () => {
       setLoading(true);
-      // select("*") — table_unit ustuni hali qo'shilmagan bo'lsa ham xato bermaydi
+      // select("*") — table_unit/uses_staff ustunlari bo'lmasa ham xato bermaydi
       const { data } = await supabase
         .from("categories")
         .select("*")
@@ -33,6 +40,8 @@ export function useBookingMode(): { mode: BookingMode; unit: TableUnit; loading:
       const m = data?.booking_mode;
       setMode(m === "table" || m === "daily" ? m : "slots");
       setUnit(data?.table_unit === "computer" ? "computer" : "table");
+      // Bazada bayroq nomi — categories.uses_staff (usta/xodim ishlatiladimi)
+      setHasWorkers(data?.uses_staff === true);
       setLoading(false);
     }, 0);
     return () => {
@@ -41,5 +50,5 @@ export function useBookingMode(): { mode: BookingMode; unit: TableUnit; loading:
     };
   }, [categoryId]);
 
-  return { mode, unit, loading };
+  return { mode, unit, hasWorkers, loading };
 }
