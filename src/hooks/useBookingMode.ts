@@ -4,10 +4,14 @@
 //   daily — dacha/villa: mijoz kelish–ketish sanalarini tanlaydi (kunlik bron)
 // unit — table rejimidagi birlik turi: "table" (stol) yoki "computer" (kompyuter klub).
 //
-// usesDepartments / usesStaff — shifoxona (klinika) rejimi bayroqchalari:
+// usesDepartments / usesStaff — xodimli bizneslar bayroqchalari:
 //   usesDepartments — biznes ichida bo'limlar bor (Kardiologiya, Urologiya…)
-//   usesStaff       — biznes ichida shifokorlar (xodimlar) bor
+//   usesStaff       — biznes ichida xodimlar bor (klinikada shifokor,
+//                     sartaroshxonada usta — ikkalasi ham provider_staff)
 // Ikkalasi ham kategoriya qatoridan olinadi; ustun hali qo'shilmagan bo'lsa — false.
+//
+// hasWorkers — usesStaff ning eski nomi (sartaroshxona konteksti). Mavjud
+// kodlarni buzmaslik uchun alias sifatida qaytariladi.
 import { useEffect, useState } from "react";
 import { useProvider } from "@/context/ProviderContext";
 import { supabase } from "@/lib/supabase";
@@ -20,6 +24,8 @@ export function useBookingMode(): {
   unit: TableUnit;
   usesDepartments: boolean;
   usesStaff: boolean;
+  /** @deprecated usesStaff bilan bir xil — yangi kodda usesStaff ishlating */
+  hasWorkers: boolean;
   loading: boolean;
 } {
   const { provider } = useProvider();
@@ -48,6 +54,7 @@ export function useBookingMode(): {
       setMode(m === "table" || m === "daily" ? m : "slots");
       setUnit(data?.table_unit === "computer" ? "computer" : "table");
       setUsesDepartments(data?.uses_departments === true);
+      // Bazada bayroq nomi — categories.uses_staff (usta/shifokor ishlatiladimi)
       setUsesStaff(data?.uses_staff === true);
       setLoading(false);
     }, 0);
@@ -57,5 +64,5 @@ export function useBookingMode(): {
     };
   }, [categoryId]);
 
-  return { mode, unit, usesDepartments, usesStaff, loading };
+  return { mode, unit, usesDepartments, usesStaff, hasWorkers: usesStaff, loading };
 }

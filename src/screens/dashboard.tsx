@@ -13,6 +13,7 @@ import {
   TrendingUp,
   Trophy,
   Users,
+  Wallet,
 } from "lucide-react-native";
 import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -33,6 +34,7 @@ import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useAppointments, type Appointment } from "@/hooks/useAppointments";
 import { useWaitlistEntries } from "@/hooks/useWaitlistEntries";
+import { useWallet } from "@/hooks/useWallet";
 import { supabase } from "@/lib/supabase";
 import { formatSom } from "@/utils/price";
 import { addDaysStr, createTashkentClock, formatUzDate } from "@/utils/tashkent";
@@ -47,12 +49,12 @@ const toMin = (t?: string | null) => {
 };
 
 // Bugungi jadval slotlari — bandlik foizi uchun.
-// Shifokor kirgan bo'lsa faqat O'Z slotlari olinadi (RLS ham shunday beradi).
+// Xodim (usta/shifokor) kirgan bo'lsa faqat O'Z slotlari olinadi (RLS ham shunday beradi).
 function useTodaySlots(today: string, staffId: string | null) {
   const { provider } = useProvider();
   const providerId = provider?.id;
   // Klinikada jadval "shared" rejimida butun biznesga umumiy bo'ladi — u holda
-  // shifokorning ish vaqti staff_id NULL bo'lgan qatorlarda turadi.
+  // xodimning ish vaqti staff_id NULL bo'lgan qatorlarda turadi.
   const sharedSchedule = provider?.schedule_mode === "shared";
   const [slots, setSlots] = useState<{ start_time: string; end_time: string }[]>([]);
   useEffect(() => {
@@ -169,13 +171,14 @@ function OverviewContent() {
   const { t } = useLanguage();
   const { appointments: allAppointments, loading, reload } = useAppointments();
   const { entries: waitlist, reload: reloadWaitlist } = useWaitlistEntries();
+  const { wallet, reload: reloadWallet } = useWallet();
   const { isStaff, staffId } = useStaffRoleContext();
   const router = useRouter();
 
   const now = tashkentClock.now();
   const today = now.dateStr;
 
-  // Shifokor uchun boshqaruv paneli faqat uning o'z bronlaridan tuziladi
+  // Xodim uchun boshqaruv paneli faqat uning o'z bronlaridan tuziladi
   const appointments = useMemo(
     () =>
       isStaff && staffId ? allAppointments.filter((a) => a.staff_id === staffId) : allAppointments,
@@ -327,6 +330,7 @@ function OverviewContent() {
       onRefresh={() => {
         reload();
         reloadWaitlist();
+        reloadWallet();
       }}
     >
       {/* Sarlavha + tezkor tugmalar */}
@@ -335,7 +339,7 @@ function OverviewContent() {
           <Text style={styles.title}>{t("pv.nav_dashboard")}</Text>
         </View>
         <View style={{ flexDirection: "row", gap: 8 }}>
-          {/* Statistika — egada butun biznes, shifokorda faqat o'z bronlari
+          {/* Statistika — egada butun biznes, xodimda faqat o'z bronlari
               kesimida hisoblanadi (useProviderStats staff_id bo'yicha filtrlaydi) */}
           <GlassIconButton onPress={() => router.push("/stats")}>
             <BarChart3 size={18} color={colors.onSurfaceVariant} />
@@ -374,7 +378,7 @@ function OverviewContent() {
             </Text>
           </View>
         </GlassSurface>
-        {/* Navbat — butun biznesga tegishli, shifokorda ko'rsatilmaydi */}
+        {/* Navbat — butun biznesga tegishli, xodimda ko'rsatilmaydi */}
         {!isStaff && (
           <GlassSurface style={styles.chip} fallbackStyle={styles.chipFallback}>
             <View style={[styles.chipIcon, { backgroundColor: alpha(colors.secondaryContainer, 0.18) }]}>
@@ -389,6 +393,39 @@ function OverviewContent() {
           </GlassSurface>
         )}
       </View>
+
+      {/* Hisobim — ichki hisob raqam + yig'ilgan summa (wallet).
+          Xodimda ko'rsatilmaydi — bu biznesning umumiy hisobi. */}
+      {!isStaff && wallet?.account_number ? (
+        <GlassSurface style={styles.walletCard} fallbackStyle={styles.walletFallback}>
+          <View style={styles.walletTopRow}>
+            <View style={styles.walletIcon}>
+              <Wallet size={16} color={colors.primary} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.walletLabel}>{t("wallet.title")}</Text>
+              <Text style={styles.walletAccount} numberOfLines={1}>
+                {wallet.account_number}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.walletValueRow}>
+            <Text style={styles.walletValue} numberOfLines={1} adjustsFontSizeToFit>
+              {wallet.earned_total > 0 ? formatSom(wallet.earned_total) : "0"}
+            </Text>
+            <Text style={styles.walletSuffix}>{t("pv.som")}</Text>
+          </View>
+          <View style={styles.walletMetaRow}>
+            <Text style={styles.walletMeta}>
+              {t("wallet.online")}: {formatSom(wallet.online_collected) || "0"}
+            </Text>
+            <View style={styles.walletMetaDot} />
+            <Text style={styles.walletMeta}>
+              {t("wallet.cash")}: {formatSom(wallet.cash_collected) || "0"}
+            </Text>
+          </View>
+        </GlassSurface>
+      ) : null}
 
       {/* ── Statistika ── Spinner faqat birinchi yuklanishda; refresh'da tepadagi logo yetadi */}
       {loading && appointments.length === 0 ? (
@@ -685,6 +722,51 @@ const useStyles = makeThemedStyles((colors) =>
 
     apptName: { fontWeight: "600", fontSize: 14, color: colors.onSurface },
     apptService: { fontSize: 12, color: colors.onSurfaceVariant, marginTop: 1 },
+
+    // Hisobim (wallet) bloki
+    walletCard: { borderRadius: radius.xl, padding: 16, overflow: "hidden", gap: 10 },
+    walletFallback: {
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1,
+      borderColor: colors.outlineVariant,
+    },
+    walletTopRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+    walletIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: radius.md,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: alpha(colors.primaryContainer, 0.16),
+    },
+    walletLabel: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: colors.onSurfaceVariant,
+      textTransform: "uppercase",
+      letterSpacing: 0.6,
+    },
+    walletAccount: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: colors.onSurface,
+      letterSpacing: 1,
+      fontVariant: ["tabular-nums"],
+      marginTop: 1,
+    },
+    walletValueRow: { flexDirection: "row", alignItems: "baseline", gap: 6 },
+    walletValue: {
+      fontSize: 26,
+      fontWeight: "800",
+      color: colors.primary,
+      letterSpacing: -0.6,
+      fontVariant: ["tabular-nums"],
+      flexShrink: 1,
+    },
+    walletSuffix: { fontSize: 13, fontWeight: "700", color: colors.onSurfaceVariant },
+    walletMetaRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+    walletMeta: { fontSize: 12, color: colors.onSurfaceVariant, fontWeight: "500" },
+    walletMetaDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.outlineVariant },
 
     sectionRow: {
       flexDirection: "row",

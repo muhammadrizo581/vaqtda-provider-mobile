@@ -20,7 +20,7 @@ import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
   const { colors } = useTheme();
   const [introDone, setIntroDone] = useState(false);
 
@@ -29,11 +29,13 @@ function RootNavigator() {
     SplashScreen.hideAsync();
   }, []);
 
-  // Panelga kirish huquqi AuthContext'da tekshiriladi (provayder roli YOKI
-  // klinikaga biriktirilgan shifokor) — ruxsati yo'q sessiya u yerda yopiladi.
-  // Shu sababli bu yerda profiles.role ni qayta tekshirmaymiz: shifokorning
-  // roli "client" bo'lib qolaveradi (u boshqa joyda mijoz bo'lishi mumkin).
-  const isProvider = isAuthenticated;
+  // Panelga KIRISH huquqi AuthContext'da tekshiriladi (provayder roli, biznes
+  // egaligi YOKI provider_staff a'zoligi) — ruxsati yo'q sessiya u yerda yopiladi.
+  // Bu yerda faqat QAYSI panel ochilishi hal qilinadi:
+  //   role === "worker"  → (worker) — usta/shifokorning o'z paneli
+  //   qolgani (provider/admin) → (tabs) — biznes egasining paneli
+  const isWorker = isAuthenticated && user?.role === "worker";
+  const isProvider = isAuthenticated && !isWorker;
   const showOverlay = loading || !introDone;
 
   return (
@@ -52,6 +54,9 @@ function RootNavigator() {
             <Stack.Screen name="settings" />
             <Stack.Screen name="schedule" />
             <Stack.Screen name="services" />
+            {/* Sartaroshxona kabi bizneslar — ustalar */}
+            <Stack.Screen name="workers" />
+            {/* Shifoxona/klinika — bo'limlar va shifokorlar */}
             <Stack.Screen name="departments" />
             <Stack.Screen name="staff" />
             <Stack.Screen name="menu" />
@@ -62,7 +67,10 @@ function RootNavigator() {
             <Stack.Screen name="payment-settings" />
             <Stack.Screen name="chat/[id]" />
           </Stack.Protected>
-          <Stack.Protected guard={!isProvider}>
+          <Stack.Protected guard={isWorker}>
+            <Stack.Screen name="(worker)" />
+          </Stack.Protected>
+          <Stack.Protected guard={!isProvider && !isWorker}>
             <Stack.Screen name="login" />
           </Stack.Protected>
         </Stack>

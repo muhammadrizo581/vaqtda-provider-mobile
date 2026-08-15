@@ -21,6 +21,8 @@ export interface ProviderProfile {
   reviews_count: number;
   status: string; // pending | approved | ...
   is_active: boolean;
+  // Ustalar o'z narxini belgilaydimi (workers.tsx tugmasi)
+  staff_sets_own_price?: boolean;
   phone_number?: string | null;
   region_id?: string | null;
   // Klinika jadval rejimi: "shared" — butun biznesga bitta jadval,
@@ -32,6 +34,7 @@ export interface ProviderProfile {
   prepayment_type?: "none" | "percent" | "fixed" | "full" | null;
   prepayment_percent?: number | null;
   prepayment_amount?: number | null;
+
   // Tarif (subscription): 60 kunlik bepul PRO sinov, keyin PLUS/PRO — hozircha
   // ruchnoy tasdiqlanadi (to'lov tizimi ulanmagunicha). plan.tsx shu maydonlarni ishlatadi.
   plan_code?: "plus" | "pro" | null;
@@ -39,6 +42,10 @@ export interface ProviderProfile {
   trial_ends_at?: string | null;
   plan_started_at?: string | null;
   plan_expires_at?: string | null;
+
+  // Ichki hisob raqam (wallet) — tolov-hisob.sql beradi
+  account_number?: string | null;
+
 }
 
 export function useProviderProfile() {
