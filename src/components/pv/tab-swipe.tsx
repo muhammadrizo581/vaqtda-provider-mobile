@@ -8,14 +8,17 @@ import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useStaffRoleContext } from "@/context/StaffRoleContext";
 
 // Tartib (tabs)/_layout.tsx dagi triggerlar bilan bir xil bo'lishi shart
-const TABS = ["/", "/appointments", "/chat", "/waitlist", "/more"] as const;
+const TABS = ["/", "/appointments", "/chat", "/waitlist", "/queue", "/more"] as const;
 export type TabPath = (typeof TABS)[number];
 
 export function TabSwipe({ tab, children }: { tab: TabPath; children: React.ReactNode }) {
   const router = useRouter();
   const { isStaff } = useStaffRoleContext();
-  // Shifokorda Navbat tabi yashirin — surish ham unga tushib qolmasin
-  const tabs: readonly TabPath[] = isStaff ? TABS.filter((x) => x !== "/waitlist") : TABS;
+  // Shifokorda Navbat(waitlist) yashirin, egada esa Navbat(queue) yashirin —
+  // surish ham yashirin tabga tushib qolmasin
+  const tabs: readonly TabPath[] = isStaff
+    ? TABS.filter((x) => x !== "/waitlist")
+    : TABS.filter((x) => x !== "/queue");
   const idx = tabs.indexOf(tab);
 
   const go = (dir: 1 | -1) => {

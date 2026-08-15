@@ -13,6 +13,7 @@ import {
   CalendarDays,
   ChevronRight,
   CreditCard,
+  Crown,
   LogIn,
   LogOut,
   Monitor,
@@ -153,6 +154,14 @@ export default function MoreScreen() {
           },
         ]
       : []),
+    {
+      key: "plan",
+      icon: Crown,
+      title: t("pv.more_plan"),
+      subtitle: t("pv.more_plan_sub"),
+      href: "/plan" as Href,
+      tone: "tertiary",
+    },
     {
       key: "cards",
       icon: CreditCard,
