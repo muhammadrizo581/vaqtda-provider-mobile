@@ -4,7 +4,8 @@
 // shuning uchun qolgan bo'limlar o'zimizning "Boshqa" ekranidan ochiladi.
 //
 // Klinika xodimi (shifokor) uchun panel cheklangan: Navbat (waitlist) butun
-// biznesga tegishli bo'lgani uchun yashiriladi, qolganlari o'z ma'lumoti bilan.
+// biznesga tegishli bo'lgani uchun yashiriladi, o'rniga o'z bo'limidagi jonli
+// navbat (queue) ko'rsatiladi; qolgan bo'limlar o'z ma'lumoti bilan ishlaydi.
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Badge, Icon, Label, NativeTabs, VectorIcon } from "expo-router/unstable-native-tabs";
 import React from "react";
@@ -44,6 +45,11 @@ export default function TabsLayout() {
       <NativeTabs.Trigger name="waitlist" hidden={isStaff}>
         <Icon sf="hourglass" androidSrc={<VectorIcon family={MaterialIcons} name="hourglass-empty" />} />
         <Label>{t("pv.nav_waitlist")}</Label>
+      </NativeTabs.Trigger>
+      {/* Navbat — faqat shifokor uchun, o'z bo'limidagi jonli navbat */}
+      <NativeTabs.Trigger name="queue" hidden={!isStaff}>
+        <Icon sf="stethoscope" androidSrc={<VectorIcon family={MaterialIcons} name="hourglass-top" />} />
+        <Label>{t("pv.nav_queue")}</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="more">
         <Icon
