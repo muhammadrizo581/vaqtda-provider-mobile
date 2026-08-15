@@ -130,7 +130,15 @@ Deno.serve(async (req) => {
       return json({ error: "staff_insert_failed" }, 500);
     }
 
-    return json({ ok: true, staff_id: staff.id, username });
+    // 10) worker_credentials — login/parolni OCHIQ saqlaymiz (RLS: faqat ega o'qiydi).
+    //     Shifokorlar bilan bir xil jadval → Ustalar ekranida ham login+parol
+    //     doim ko'rsatiladi. Yangi usta — doim INSERT. Xatoni javobda qaytaramiz.
+    const { error: credErr } = await admin
+      .from("worker_credentials")
+      .insert({ worker_id: staff.id, provider_id: provider.id, username, password, email });
+    if (credErr) console.error("worker_credentials insert failed:", credErr.message);
+
+    return json({ ok: true, staff_id: staff.id, username, cred_error: credErr?.message ?? null });
   } catch (_e) {
     return json({ error: "server_error" }, 500);
   }
