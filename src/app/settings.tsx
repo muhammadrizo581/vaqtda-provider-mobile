@@ -161,7 +161,7 @@ export default function SettingsScreen() {
             return (
               <Pressable
                 key={value}
-                onPress={(e) => setMode(value, { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
+                onPress={() => setMode(value)}
                 style={{ flex: 1 }}
               >
                 <GlassSurface

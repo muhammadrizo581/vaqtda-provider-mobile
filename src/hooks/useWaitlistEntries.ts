@@ -72,11 +72,31 @@ export function useWaitlistEntries() {
     }
   }, [providerId]);
 
-  // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
+  const notify = useCallback(async (id: string) => {
+    const { error: err } = await supabase
+      .from("waitlist")
+      .update({
+        status: "notified",
+        notified_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+    if (!err) {
+      setEntries((prev) =>
+        prev.map((e) =>
+          e.id === id
+            ? { ...e, status: "notified", notified_at: new Date().toISOString() }
+            : e
+        )
+      );
+      return true;
+    }
+    return false;
+  }, []);
+
   useEffect(() => {
     const t = setTimeout(load, 0);
     return () => clearTimeout(t);
   }, [load]);
 
-  return { entries, loading, error, reload: load };
+  return { entries, loading, error, reload: load, notify };
 }

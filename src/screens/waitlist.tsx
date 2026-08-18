@@ -1,7 +1,7 @@
 // Navbat (waitlist) — saytdagi app/dashboard/waitlist/page.tsx dan port.
-import { BellRing, CheckCircle2, Hourglass, Phone, Zap } from "lucide-react-native";
-import React, { useMemo } from "react";
-import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { BellRing, CheckCircle2, Hourglass, Phone, Send, Zap } from "lucide-react-native";
+import React, { useMemo, useState } from "react";
+import { Alert, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { BusinessGate } from "@/components/pv/business-gate";
 import { Screen } from "@/components/pv/screen";
 import {
@@ -9,14 +9,17 @@ import {
   ClientAvatar,
   EmptyState,
   PageHeader,
+  SmallButton,
   Spinner,
   StatCard,
   StatusBadge,
 } from "@/components/pv/ui";
 import { alpha } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { useProvider } from "@/context/ProviderContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useWaitlistEntries, type WaitlistEntry } from "@/hooks/useWaitlistEntries";
+import { EskizService } from "@/services/eskiz";
 import { localize } from "@/utils/localize";
 import { formatUzDate } from "@/utils/tashkent";
 
@@ -25,8 +28,10 @@ const hhmm = (t: string | null) => (t ? t.slice(0, 5) : "");
 function WaitlistContent() {
   const colors = useColors();
   const styles = useStyles();
-  const { t } = useLanguage();
-  const { entries, loading, reload } = useWaitlistEntries();
+  const { t, lang } = useLanguage();
+  const { provider } = useProvider();
+  const { entries, loading, reload, notify } = useWaitlistEntries();
+  const [notifyingId, setNotifyingId] = useState<string | null>(null);
 
   const stats = useMemo(() => {
     const waiting = entries.filter((e) => e.status === "waiting").length;
@@ -69,6 +74,43 @@ function WaitlistContent() {
     return range + time;
   };
 
+  const handleNotifySlot = (e: WaitlistEntry) => {
+    if (!e.client?.phone) {
+      Alert.alert("Xatolik", "Mijozning telefon raqami ko'rsatilmagan.");
+      return;
+    }
+    const pName = localize(provider?.business_name, lang) || provider?.slug || "Vaqtda";
+    const time = e.time_from ? hhmm(e.time_from) : "10:00";
+
+    Alert.alert(
+      "SMS xabarnoma yuborish",
+      `${e.client.full_name || "Mijoz"}ga bo'sh joy ochilgani haqida SMS xabar yuborilsinmi?`,
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: "SMS yuborish",
+          onPress: async () => {
+            setNotifyingId(e.id);
+            try {
+              await EskizService.sendWaitlistSlotOpenedSms({
+                phone: e.client!.phone!,
+                providerName: pName,
+                date: e.desired_date,
+                time,
+              });
+              await notify(e.id);
+              Alert.alert("Muvaffaqiyatli", "Mijozga SMS xabarnoma yuborildi!");
+            } catch {
+              Alert.alert("Xatolik", "SMS yuborishda xatolik yuz berdi");
+            } finally {
+              setNotifyingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <Screen refreshing={loading} onRefresh={reload}>
       <PageHeader title={t("pv.wl_title")} />
@@ -108,6 +150,9 @@ function WaitlistContent() {
           sorted.map((e, i) => {
             const st = statusMeta(e.status);
             const note = localize(e.note);
+            const isWaiting = e.status === "waiting";
+            const isNotifyingThis = notifyingId === e.id;
+
             return (
               <View
                 key={e.id}
@@ -138,7 +183,18 @@ function WaitlistContent() {
                       ) : null}
                     </View>
                   </View>
-                  <StatusBadge label={st.label} tone={st.tone} />
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <StatusBadge label={st.label} tone={st.tone} />
+                    {isWaiting && e.client?.phone ? (
+                      <SmallButton
+                        label={isNotifyingThis ? "Yuborilmoqda..." : "SMS xabar"}
+                        icon={Send}
+                        onPress={() => handleNotifySlot(e)}
+                        variant="primary"
+                        disabled={isNotifyingThis}
+                      />
+                    ) : null}
+                  </View>
                 </View>
 
                 <View style={styles.metaRow}>
@@ -178,42 +234,61 @@ export default function WaitlistScreen() {
   );
 }
 
-const useStyles = makeThemedStyles((colors) => StyleSheet.create({
-  statsRow: { flexDirection: "row", gap: 8 },
+const useStyles = makeThemedStyles((colors) =>
+  StyleSheet.create({
+    statsRow: { flexDirection: "row", gap: 8 },
 
-  row: { padding: 16, gap: 10 },
-  rowTop: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 },
-  clientWrap: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0 },
-  rank: { fontSize: 16, fontWeight: "700", color: colors.onSurfaceVariant, width: 20 },
-  name: { fontWeight: "600", fontSize: 14, color: colors.onSurface },
-  phoneRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2, alignSelf: "flex-start" },
-  phoneText: { fontSize: 12, color: colors.secondary },
+    row: { padding: 16, gap: 10 },
+    rowTop: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 12,
+    },
+    clientWrap: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1, minWidth: 0 },
+    rank: { fontSize: 16, fontWeight: "700", color: colors.onSurfaceVariant, width: 20 },
+    name: { fontWeight: "600", fontSize: 14, color: colors.onSurface },
+    phoneRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      marginTop: 2,
+      alignSelf: "flex-start",
+    },
+    phoneText: { fontSize: 12, color: colors.secondary },
 
-  metaRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap", paddingLeft: 32 },
-  dateText: { fontSize: 12, fontWeight: "600", color: colors.onSurface },
-  flexBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: alpha(colors.tertiaryContainer, 0.2),
-    borderWidth: 1,
-    borderColor: alpha(colors.tertiaryContainer, 0.3),
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 999,
-  },
-  flexText: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: colors.tertiary,
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-  },
-  duration: { fontSize: 12, color: colors.onSurfaceVariant },
-  note: {
-    fontSize: 12,
-    color: alpha(colors.onSurfaceVariant, 0.8),
-    fontStyle: "italic",
-    paddingLeft: 32,
-  },
-}));
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      flexWrap: "wrap",
+      paddingLeft: 32,
+    },
+    dateText: { fontSize: 12, fontWeight: "600", color: colors.onSurface },
+    flexBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      backgroundColor: alpha(colors.tertiaryContainer, 0.2),
+      borderWidth: 1,
+      borderColor: alpha(colors.tertiaryContainer, 0.3),
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 999,
+    },
+    flexText: {
+      fontSize: 10,
+      fontWeight: "700",
+      color: colors.tertiary,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+    },
+    duration: { fontSize: 12, color: colors.onSurfaceVariant },
+    note: {
+      fontSize: 12,
+      color: alpha(colors.onSurfaceVariant, 0.8),
+      fontStyle: "italic",
+      paddingLeft: 32,
+    },
+  })
+);

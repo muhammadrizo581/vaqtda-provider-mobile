@@ -28,10 +28,12 @@ import {
 } from "@/components/pv/ui";
 import { alpha } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
+import { useProvider } from "@/context/ProviderContext";
 import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useAppointments, type Appointment } from "@/hooks/useAppointments";
 import { useBookingMode } from "@/hooks/useBookingMode";
+import { EskizService } from "@/services/eskiz";
 import { localize } from "@/utils/localize";
 import { formatSom } from "@/utils/price";
 import { addDaysStr, createTashkentClock, formatUzDate, UZ_WEEKDAYS, weekdayKeyOf } from "@/utils/tashkent";
@@ -108,6 +110,7 @@ function AppointmentsContent() {
   const colors = useColors();
   const styles = useStyles();
   const { t, lang } = useLanguage();
+  const { provider } = useProvider();
   const {
     appointments: allAppointments,
     loading,
@@ -223,7 +226,55 @@ function AppointmentsContent() {
     if (action === "cancel") {
       Alert.alert(t("pv.cancel_booking"), t("pv.confirm_cancel"), [
         { text: t("common.cancel"), style: "cancel" },
-        { text: t("common.confirm"), style: "destructive", onPress: run },
+        {
+          text: t("common.confirm"),
+          style: "destructive",
+          onPress: async () => {
+            setActingId(a.id);
+            const ok = await act(a.id, "cancel");
+            setActingId(null);
+            if (!ok) {
+              Alert.alert(t("pv.act_failed"));
+              return;
+            }
+
+            // Bekor qilinganda mijozga rasmiy shablon bo'yicha SMS yuborish
+            if (a.client?.phone) {
+              const pName = localize(provider?.business_name, lang) || provider?.slug || "Vaqtda";
+              const sName = localize(a.services?.name, lang) || "Xizmat";
+              const cName = a.client.full_name || "Mijoz";
+              const time = hhmm(a.start_time);
+
+              if (a.paid_amount > 0) {
+                // 6. To'lov qaytarilishi bilan birga
+                EskizService.sendRefundCancelSms({
+                  phone: a.client.phone,
+                  clientName: cName,
+                  providerName: pName,
+                  date: a.booking_date,
+                  time,
+                }).catch(() => {});
+              } else if (a.staff_name) {
+                // 7. Usta/mutaxassis bekor qilganda
+                EskizService.sendTransferStaffCancelSms({
+                  phone: a.client.phone,
+                  clientName: cName,
+                  staffName: a.staff_name,
+                }).catch(() => {});
+              } else {
+                // 8. Provayder tomonidan bekor qilinganda
+                EskizService.sendProviderCancelSms({
+                  phone: a.client.phone,
+                  clientName: cName,
+                  providerName: pName,
+                  date: a.booking_date,
+                  time,
+                  serviceName: sName,
+                }).catch(() => {});
+              }
+            }
+          },
+        },
       ]);
     } else {
       // Yakunlash: qolgan summa bo'lsa (narx > to'langan) — to'lov modalini ochamiz,
