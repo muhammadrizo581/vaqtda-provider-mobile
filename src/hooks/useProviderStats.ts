@@ -24,12 +24,21 @@ export interface StatSlot {
   end_time: string;
 }
 
+export interface StatPayment {
+  id: string;
+  amount: number;
+  method: string;
+  status: string;
+  created_at: string;
+}
+
 export function useProviderStats() {
   const { provider, loading: providerLoading } = useProvider();
   const { loading: roleLoading, isStaff, staffId } = useStaffRoleContext();
   const [loading, setLoading] = useState(true);
   const [bookings, setBookings] = useState<StatBooking[]>([]);
   const [slots, setSlots] = useState<StatSlot[]>([]);
+  const [payments, setPayments] = useState<StatPayment[]>([]);
 
   const providerId = provider?.id;
   // Klinikada jadval butun biznesga umumiy bo'lishi mumkin ("shared") — u holda
@@ -47,6 +56,7 @@ export function useProviderStats() {
       if (!providerId || (isStaff && !staffId)) {
         setBookings([]);
         setSlots([]);
+        setPayments([]);
         setLoading(false);
         return;
       }
@@ -59,18 +69,25 @@ export function useProviderStats() {
         .from("timetable_slots")
         .select("slot_date, start_time, end_time")
         .eq("provider_id", providerId);
+      let pmQ = supabase
+        .from("payments")
+        .select("id, amount, method, status, created_at")
+        .eq("provider_id", providerId)
+        .eq("status", "paid");
+
       if (isStaff && staffId) {
         bkQ = bkQ.eq("staff_id", staffId);
         // Klinika "shared" jadval rejimida bo'lsa, shifokorning ish vaqti butun
         // biznesniki — qatorlarda staff_id NULL turadi
         slQ = sharedSchedule ? slQ.is("staff_id", null) : slQ.eq("staff_id", staffId);
       }
-      const [bk, sl] = await Promise.all([bkQ, slQ]);
+      const [bk, sl, pm] = await Promise.all([bkQ, slQ, isStaff ? Promise.resolve({ data: [] }) : pmQ]);
       if (cancelled) return;
       // staff_id ustuni hali qo'shilmagan bo'lsa so'rov xato qaytaradi —
       // bunday holatda shifokorga bo'sh statistika ko'rsatiladi, umumiy EMAS
       setBookings(bk.error ? [] : (bk.data as StatBooking[]) || []);
       setSlots(sl.error ? [] : (sl.data as StatSlot[]) || []);
+      setPayments((pm as any)?.data || []);
       setLoading(false);
     }, 0);
     return () => {
@@ -79,5 +96,5 @@ export function useProviderStats() {
     };
   }, [providerId, providerLoading, roleLoading, isStaff, staffId, sharedSchedule]);
 
-  return { loading, hasProvider: providerLoading ? null : !!provider, bookings, slots };
+  return { loading, hasProvider: providerLoading ? null : !!provider, bookings, slots, payments };
 }

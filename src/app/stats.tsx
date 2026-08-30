@@ -106,7 +106,7 @@ export default function StatsScreen() {
   const { t, lang } = useLanguage();
   const ru = lang === "ru";
   const router = useRouter();
-  const { loading, bookings, slots } = useProviderStats();
+  const { loading, bookings, slots, payments = [] } = useProviderStats();
   // Shifokor uchun raqamlar faqat uning o'z bronlaridan olinadi (hook'da
   // staff_id bo'yicha filtrlangan) — buni ekranda ham eslatib qo'yamiz
   const { isStaff } = useStaffRoleContext();
@@ -129,6 +129,26 @@ export default function StatsScreen() {
 
     const revenue = completed.reduce((s, b) => s + (Number(b.price) || 0), 0);
     const clients = new Set(nonCancelled.map((b) => b.client_id)).size;
+
+    // To'lovlar tushumi (Click / Payme / Naqd)
+    const periodPayments = payments.filter((p) => {
+      const d = p.created_at ? p.created_at.slice(0, 10) : "";
+      return inPeriod(d);
+    });
+
+    const clickRevenue = periodPayments
+      .filter((p) => p.method === "click")
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
+
+    const paymeRevenue = periodPayments
+      .filter((p) => p.method === "payme")
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
+
+    const cashRevenue = periodPayments
+      .filter((p) => p.method === "cash")
+      .reduce((s, p) => s + Number(p.amount || 0), 0);
+
+    const totalPeriodPayments = clickRevenue + paymeRevenue + cashRevenue;
 
     const bookedMin = nonCancelled.reduce((s, b) => s + (b.duration_minutes || 0), 0);
     const availMin = slots
@@ -173,6 +193,10 @@ export default function StatsScreen() {
 
     return {
       revenue,
+      clickRevenue,
+      paymeRevenue,
+      cashRevenue,
+      totalPeriodPayments,
       clients,
       total: periodBk.length,
       completed: completed.length,
@@ -182,9 +206,9 @@ export default function StatsScreen() {
       trend,
       weekday,
       hours,
-      hasData: periodBk.length > 0,
+      hasData: periodBk.length > 0 || periodPayments.length > 0,
     };
-  }, [bookings, slots, period, ru]);
+  }, [bookings, slots, payments, period, ru]);
 
   const periods: { key: Period; label: string }[] = [
     { key: "week", label: t("stats.period_week") },
@@ -268,6 +292,44 @@ export default function StatsScreen() {
               />
             )}
           </View>
+
+          {/* To'lov usullari bo'yicha tushum (Click vs Payme vs Naqd) */}
+          {!isStaff && (
+            <Card style={{ padding: 14, gap: 10 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <Text style={styles.chartTitle}>To'lov kanallari bo'yicha tushum</Text>
+                <Text style={{ fontSize: 12, fontWeight: "800", color: colors.primary }}>
+                  {fmtUZS(stats.totalPeriodPayments, ru)}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: "row", gap: 8 }}>
+                {/* Click */}
+                <View style={{ flex: 1, padding: 10, borderRadius: radius.md, backgroundColor: "rgba(0, 115, 255, 0.1)", borderWidth: 1, borderColor: "rgba(0, 115, 255, 0.25)" }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#3b82f6" }}>Click</Text>
+                  <Text style={{ fontSize: 13, fontWeight: "900", color: colors.onSurface, marginTop: 4 }}>
+                    {fmtUZS(stats.clickRevenue, ru)}
+                  </Text>
+                </View>
+
+                {/* Payme */}
+                <View style={{ flex: 1, padding: 10, borderRadius: radius.md, backgroundColor: "rgba(0, 204, 204, 0.1)", borderWidth: 1, borderColor: "rgba(0, 204, 204, 0.25)" }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#0d9488" }}>Payme</Text>
+                  <Text style={{ fontSize: 13, fontWeight: "900", color: colors.onSurface, marginTop: 4 }}>
+                    {fmtUZS(stats.paymeRevenue, ru)}
+                  </Text>
+                </View>
+
+                {/* Naqd */}
+                <View style={{ flex: 1, padding: 10, borderRadius: radius.md, backgroundColor: "rgba(245, 158, 11, 0.1)", borderWidth: 1, borderColor: "rgba(245, 158, 11, 0.25)" }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#d97706" }}>Naqd pul</Text>
+                  <Text style={{ fontSize: 13, fontWeight: "900", color: colors.onSurface, marginTop: 4 }}>
+                    {fmtUZS(stats.cashRevenue, ru)}
+                  </Text>
+                </View>
+              </View>
+            </Card>
+          )}
 
           {!stats.hasData ? (
             <Card style={{ padding: 40 }}>

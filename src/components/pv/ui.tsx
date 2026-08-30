@@ -603,3 +603,80 @@ const useStyles = makeThemedStyles((colors) =>
     },
   })
 );
+
+// ── To'lov usuli nishoni (Click / Payme / Naqd) ──
+export function PaymentMethodBadge({
+  method,
+  amount,
+  kind,
+}: {
+  method?: string | null;
+  amount?: number | null;
+  kind?: string | null;
+}) {
+  const m = (method || "").toLowerCase();
+
+  if (m === "click") {
+    return (
+      <View style={[badgeStyles.container, { backgroundColor: "rgba(0, 115, 255, 0.12)", borderColor: "rgba(0, 115, 255, 0.3)" }]}>
+        <View style={[badgeStyles.dot, { backgroundColor: "#0073FF" }]} />
+        <Text style={[badgeStyles.text, { color: "#3b82f6" }]}>
+          Click{amount != null ? ` (${amount.toLocaleString("ru-RU")} so'm)` : ""}{kind === "prepayment" ? " · Oldindan" : ""}
+        </Text>
+      </View>
+    );
+  }
+
+  if (m === "payme") {
+    return (
+      <View style={[badgeStyles.container, { backgroundColor: "rgba(0, 204, 204, 0.12)", borderColor: "rgba(0, 204, 204, 0.3)" }]}>
+        <View style={[badgeStyles.dot, { backgroundColor: "#00CCCC" }]} />
+        <Text style={[badgeStyles.text, { color: "#0d9488" }]}>
+          Payme{amount != null ? ` (${amount.toLocaleString("ru-RU")} so'm)` : ""}{kind === "prepayment" ? " · Oldindan" : ""}
+        </Text>
+      </View>
+    );
+  }
+
+  if (m === "cash") {
+    return (
+      <View style={[badgeStyles.container, { backgroundColor: "rgba(245, 158, 11, 0.12)", borderColor: "rgba(245, 158, 11, 0.3)" }]}>
+        <View style={[badgeStyles.dot, { backgroundColor: "#f59e0b" }]} />
+        <Text style={[badgeStyles.text, { color: "#d97706" }]}>
+          Naqd pul{amount != null ? ` (${amount.toLocaleString("ru-RU")} so'm)` : ""}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={[badgeStyles.container, { backgroundColor: "rgba(128, 128, 128, 0.1)", borderColor: "rgba(128, 128, 128, 0.2)" }]}>
+      <Text style={[badgeStyles.text, { color: "#888888" }]}>
+        {method || "To'lov"}{amount != null ? ` (${amount.toLocaleString("ru-RU")} so'm)` : ""}
+      </Text>
+    </View>
+  );
+}
+
+const badgeStyles = StyleSheet.create({
+  container: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    alignSelf: "flex-start",
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  text: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+});
+

@@ -35,6 +35,14 @@ export interface Appointment {
   // Shu bron uchun allaqachon to'langan summa (oldindan to'lov + qolgani).
   // Qolgan summa = (price || 0) − paid_amount.
   paid_amount: number;
+  payments?: Array<{
+    id: string;
+    amount: number;
+    method: string;
+    status: string;
+    kind?: string;
+    paid_at?: string | null;
+  }>;
 }
 
 export function useAppointments() {
@@ -122,14 +130,17 @@ export function useAppointments() {
       // Har bron uchun to'langan summa (payments 'paid') — qolgan summani hisoblash uchun
       const bookingIds = [...new Set((bookings || []).map((b: any) => b.id).filter(Boolean))];
       const paidByBooking: Record<string, number> = {};
+      const paymentsByBooking: Record<string, any[]> = {};
       if (bookingIds.length > 0) {
         const { data: pays } = await supabase
           .from("payments")
-          .select("booking_id, amount, status")
+          .select("id, booking_id, amount, status, method, kind, paid_at")
           .in("booking_id", bookingIds)
           .eq("status", "paid");
         (pays || []).forEach((p: any) => {
           paidByBooking[p.booking_id] = (paidByBooking[p.booking_id] || 0) + Number(p.amount || 0);
+          if (!paymentsByBooking[p.booking_id]) paymentsByBooking[p.booking_id] = [];
+          paymentsByBooking[p.booking_id].push(p);
         });
       }
 
@@ -142,6 +153,7 @@ export function useAppointments() {
           staff_id: b.staff_id ?? null,
           staff_name: b.staff_id ? staffNames[b.staff_id] || null : null,
           paid_amount: paidByBooking[b.id] || 0,
+          payments: paymentsByBooking[b.id] || [],
         }))
       );
     } catch {

@@ -22,6 +22,7 @@ import {
   FilterPill,
   GlassSurface,
   PageHeader,
+  PaymentMethodBadge,
   SmallButton,
   Spinner,
   StatusBadge,
@@ -455,6 +456,26 @@ function AppointmentsContent() {
                             <Phone size={12} color={colors.secondary} />
                             <Text style={styles.phoneText}>{a.client.phone}</Text>
                           </Pressable>
+                        ) : null}
+                        {/* To'lov ma'lumoti (Click / Payme / Naqd) */}
+                        {a.payments && a.payments.length > 0 ? (
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                            {a.payments.map((pm, idx) => (
+                              <PaymentMethodBadge
+                                key={idx}
+                                method={pm.method}
+                                amount={pm.amount}
+                                kind={pm.kind}
+                              />
+                            ))}
+                          </View>
+                        ) : a.paid_amount > 0 ? (
+                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+                            <PaymentMethodBadge
+                              method="to'langan"
+                              amount={a.paid_amount}
+                            />
+                          </View>
                         ) : null}
                         {a.notes ? (
                           <Text style={styles.notes} numberOfLines={2}>
