@@ -26,6 +26,7 @@ import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
 import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { useBookingMode } from "@/hooks/useBookingMode";
+import { getMemoryCache, invalidateCache, readCache, writeCache, TTL_SERVICES } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
 import { formatSom } from "@/utils/price";
@@ -92,9 +93,17 @@ function ServicesContent() {
   // tahrirlamasligi kerak)
   const staffReadOnly = isStaff && !myServices;
 
-  const [services, setServices] = useState<Service[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
+  const servicesCacheKey = providerId
+    ? `services.${providerId}.${isStaff && staffId ? staffId : "all"}`
+    : "";
+
+  // 1. RAM xotiradan sinxron o'qish (0ms instant)
+  const initialServices = servicesCacheKey ? getMemoryCache<Service[]>(servicesCacheKey) : null;
+  const initialDepts = providerId ? getMemoryCache<Department[]>(`departments.${providerId}`) : null;
+
+  const [services, setServices] = useState<Service[]>(initialServices ?? []);
+  const [departments, setDepartments] = useState<Department[]>(initialDepts ?? []);
+  const [loading, setLoading] = useState<boolean>(!initialServices);
 
   // Form holati
   const [editId, setEditId] = useState<string | null>(null);
@@ -113,7 +122,15 @@ function ServicesContent() {
 
   const load = useCallback(async () => {
     if (!providerId) return;
-    setLoading(true);
+
+    // Disk keshni tekshirish
+    if (servicesCacheKey) {
+      const cachedServices = await readCache<Service[]>(servicesCacheKey);
+      if (cachedServices && cachedServices.length > 0) {
+        setServices(cachedServices);
+        setLoading(false);
+      }
+    }
 
     // worker_id ustuni bormi — yo'q bo'lsa xizmatlar biznes darajasida qoladi
     // (bugungi xatti-harakat), sahifa esa xato bermaydi.
@@ -137,7 +154,11 @@ function ServicesContent() {
     // Shifokor faqat o'z xizmatlarini boshqaradi
     if (hasWorker && isStaff && staffId) q = q.eq("worker_id", staffId);
     const { data } = await q;
-    setServices((data as Service[]) || []);
+    const freshServices = (data as Service[]) || [];
+    setServices(freshServices);
+    if (servicesCacheKey) {
+      writeCache(servicesCacheKey, freshServices, TTL_SERVICES).catch(() => {});
+    }
 
     // Shifokorning O'Z bo'limi — u allaqachon bitta bo'limga biriktirilgan,
     // shuning uchun xizmat qo'shishda bo'lim tanlanmaydi, avtomatik shu bo'lim
@@ -174,9 +195,11 @@ function ServicesContent() {
       .eq("provider_id", providerId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
-    setDepartments((deps as Department[]) || []);
+    const freshDeps = (deps as Department[]) || [];
+    setDepartments(freshDeps);
+    writeCache(`departments.${providerId}`, freshDeps, TTL_SERVICES).catch(() => {});
     setLoading(false);
-  }, [providerId, usesStaff, isStaff, staffId]);
+  }, [providerId, usesStaff, isStaff, staffId, servicesCacheKey]);
 
   // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
   useEffect(() => {
@@ -273,6 +296,7 @@ function ServicesContent() {
       if (error) throw error;
       showToast(t("svc.saved"));
       resetForm();
+      invalidateCache(`services.${providerId}`).catch(() => {});
       await load();
     } catch (e) {
       console.error("service save failed:", e);
@@ -289,16 +313,30 @@ function ServicesContent() {
       showToast(t("svc.save_failed"), "error");
       return;
     }
-    setServices((prev) => prev.filter((s) => s.id !== id));
+    setServices((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      if (servicesCacheKey) writeCache(servicesCacheKey, next, TTL_SERVICES).catch(() => {});
+      return next;
+    });
+    invalidateCache(`services.${providerId}`).catch(() => {});
     showToast(t("svc.deleted"));
   };
 
   const toggleActive = async (s: Service) => {
     const next = !s.is_active;
-    setServices((prev) => prev.map((x) => (x.id === s.id ? { ...x, is_active: next } : x)));
+    setServices((prev) => {
+      const updated = prev.map((x) => (x.id === s.id ? { ...x, is_active: next } : x));
+      if (servicesCacheKey) writeCache(servicesCacheKey, updated, TTL_SERVICES).catch(() => {});
+      return updated;
+    });
+    invalidateCache(`services.${providerId}`).catch(() => {});
     const { error } = await supabase.from("services").update({ is_active: next }).eq("id", s.id);
     if (error) {
-      setServices((prev) => prev.map((x) => (x.id === s.id ? { ...x, is_active: s.is_active } : x)));
+      setServices((prev) => {
+        const reverted = prev.map((x) => (x.id === s.id ? { ...x, is_active: s.is_active } : x));
+        if (servicesCacheKey) writeCache(servicesCacheKey, reverted, TTL_SERVICES).catch(() => {});
+        return reverted;
+      });
       showToast(t("svc.save_failed"), "error");
     }
   };

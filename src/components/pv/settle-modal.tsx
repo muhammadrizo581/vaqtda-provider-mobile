@@ -44,7 +44,9 @@ export function SettleModal({
 
   // Ochilganda bosqichni qayta tiklaymiz
   useEffect(() => {
-    if (visible) setStep("choose");
+    if (!visible) return;
+    const reset = setTimeout(() => setStep("choose"), 0);
+    return () => clearTimeout(reset);
   }, [visible]);
 
   const stopPoll = useCallback(() => {

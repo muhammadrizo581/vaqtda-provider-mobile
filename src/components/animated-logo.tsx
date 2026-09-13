@@ -8,7 +8,7 @@
 //               ham xiralikdan chiqadi.
 //   "loading" — mijoz ilovasidagi VaqtdaLoading'ga delegatsiya: aylanuvchi
 //               barglar spinneri (galochkasiz, fon kvadratisiz).
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { Animated, Easing } from "react-native";
 import Svg, { G, Path, Rect } from "react-native-svg";
 import { VaqtdaLoading } from "@/components/vaqtda-logo";
@@ -50,9 +50,9 @@ function IntroLogo({
   foreground: string;
   onFinish?: () => void;
 }) {
-  const blooms = useRef(ANGLES.map(() => new Animated.Value(0))).current;
-  const tick = useRef(new Animated.Value(0)).current;
-  const bg = useRef(new Animated.Value(0)).current;
+  const [blooms] = useState(() => ANGLES.map(() => new Animated.Value(0)));
+  const [tick] = useState(() => new Animated.Value(0));
+  const [bg] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const bloom = Easing.bezier(0.2, 0.8, 0.25, 1);

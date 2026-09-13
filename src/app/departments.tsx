@@ -35,6 +35,7 @@ import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
+import { getMemoryCache, invalidateCache, readCache, writeCache, TTL_SERVICES } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
 import { translateMultilingual } from "@/utils/translate";
@@ -57,9 +58,13 @@ function DepartmentsContent() {
   const { showToast } = useToast();
   const router = useRouter();
   const providerId = provider?.id || null;
+  const cacheKey = providerId ? `departments.${providerId}` : "";
 
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 1. RAM xotiradan sinxron o'qish (0ms instant)
+  const initialCache = cacheKey ? getMemoryCache<Department[]>(cacheKey) : null;
+
+  const [departments, setDepartments] = useState<Department[]>(initialCache ?? []);
+  const [loading, setLoading] = useState<boolean>(!initialCache);
   // Migratsiya hali qo'llanmagan bo'lsa (jadval yo'q) — sahifa xato bermay yopiladi
   const [unavailable, setUnavailable] = useState(false);
 
@@ -74,18 +79,32 @@ function DepartmentsContent() {
 
   const load = useCallback(async () => {
     if (!providerId) return;
-    setLoading(true);
-    // select("*") — ustunlar to'plami o'zgarsa ham xato bermaydi
-    const { data, error } = await supabase
-      .from("provider_departments")
-      .select("*")
-      .eq("provider_id", providerId)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true });
-    setUnavailable(!!error);
-    setDepartments((data as Department[]) || []);
-    setLoading(false);
-  }, [providerId]);
+
+    // Disk keshni tekshirish
+    const cached = await readCache<Department[]>(cacheKey);
+    if (cached && cached.length > 0) {
+      setDepartments(cached);
+      setLoading(false);
+    }
+
+    try {
+      // select("*") — ustunlar to'plami o'zgarsa ham xato bermaydi
+      const { data, error } = await supabase
+        .from("provider_departments")
+        .select("*")
+        .eq("provider_id", providerId)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      setUnavailable(!!error);
+      const fresh = (data as Department[]) || [];
+      setDepartments(fresh);
+      await writeCache(cacheKey, fresh, TTL_SERVICES);
+    } catch {
+      // Tarmoq xatosi bo'lsa kesh saqlanadi
+    } finally {
+      setLoading(false);
+    }
+  }, [providerId, cacheKey]);
 
   // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
   useEffect(() => {
@@ -158,6 +177,7 @@ function DepartmentsContent() {
       }
       showToast(t("svc.saved"));
       resetForm();
+      invalidateCache(`departments.${providerId}`).catch(() => {});
       await load();
     } catch (e) {
       console.error("department save failed:", e);
@@ -177,19 +197,33 @@ function DepartmentsContent() {
       showToast(busy ? t("dep.has_staff") : t("svc.save_failed"), "error");
       return;
     }
-    setDepartments((prev) => prev.filter((d) => d.id !== id));
+    setDepartments((prev) => {
+      const next = prev.filter((d) => d.id !== id);
+      if (cacheKey) writeCache(cacheKey, next, TTL_SERVICES).catch(() => {});
+      return next;
+    });
+    invalidateCache(`departments.${providerId}`).catch(() => {});
     showToast(t("svc.deleted"));
   };
 
   const toggleActive = async (d: Department) => {
     const next = !d.is_active;
-    setDepartments((prev) => prev.map((x) => (x.id === d.id ? { ...x, is_active: next } : x)));
+    setDepartments((prev) => {
+      const updated = prev.map((x) => (x.id === d.id ? { ...x, is_active: next } : x));
+      if (cacheKey) writeCache(cacheKey, updated, TTL_SERVICES).catch(() => {});
+      return updated;
+    });
+    invalidateCache(`departments.${providerId}`).catch(() => {});
     const { error } = await supabase
       .from("provider_departments")
       .update({ is_active: next })
       .eq("id", d.id);
     if (error) {
-      setDepartments((prev) => prev.map((x) => (x.id === d.id ? { ...x, is_active: d.is_active } : x)));
+      setDepartments((prev) => {
+        const reverted = prev.map((x) => (x.id === d.id ? { ...x, is_active: d.is_active } : x));
+        if (cacheKey) writeCache(cacheKey, reverted, TTL_SERVICES).catch(() => {});
+        return reverted;
+      });
       showToast(t("svc.save_failed"), "error");
     }
   };

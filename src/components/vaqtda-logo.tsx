@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { Animated, Easing, Platform, RefreshControl, StyleSheet, View } from "react-native";
 import Svg, { Defs, G, Path, Rect, RadialGradient, Stop } from "react-native-svg";
 
@@ -38,7 +38,7 @@ export function VaqtdaLoading({
   // aylana bo'ylab pasayadi va "quyruqli" spinner ko'rinishi hosil bo'ladi.
   // Eski 8 ta JS-thread interpolatsiya olib tashlandi: ma'lumot yuklanayotganda
   // JS thread band bo'lsa ham animatsiya to'xtamaydi/jank bermaydi.
-  const spin = useRef(new Animated.Value(0)).current;
+  const [spin] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const loop = Animated.loop(
@@ -101,7 +101,7 @@ export function VaqtdaRefreshControl(props: React.ComponentProps<typeof RefreshC
  * kirish animatsiyasi (fade + scale) bilan chiqadi.
  */
 export function VaqtdaRefreshing({ refreshing, color }: { refreshing: boolean; color?: string }) {
-  const anim = useRef(new Animated.Value(0)).current;
+  const [anim] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     Animated.timing(anim, {
@@ -164,11 +164,11 @@ export function VaqtdaIntro({
 }) {
   void backgroundColor;
 
-  const blooms = useRef(ANGLES.map(() => new Animated.Value(0))).current;
-  const tick = useRef(new Animated.Value(0)).current; // 0 → 1 (belgi chiziladi)
-  const word = useRef(new Animated.Value(0)).current; // 0 → 1 (nom paydo bo'ladi)
-  const sceneOpacity = useRef(new Animated.Value(1)).current;
-  const sceneScale = useRef(new Animated.Value(1)).current;
+  const [blooms] = useState(() => ANGLES.map(() => new Animated.Value(0)));
+  const [tick] = useState(() => new Animated.Value(0)); // 0 → 1 (belgi chiziladi)
+  const [word] = useState(() => new Animated.Value(0)); // 0 → 1 (nom paydo bo'ladi)
+  const [sceneOpacity] = useState(() => new Animated.Value(1));
+  const [sceneScale] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     const bloom = Easing.bezier(0.2, 0.8, 0.25, 1);
@@ -209,9 +209,9 @@ export function VaqtdaIntro({
   const wordTranslate = word.interpolate({ inputRange: [0, 1], outputRange: [10, 0] });
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: sceneOpacity, zIndex: 999 }]}>
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity: sceneOpacity, zIndex: 999 }]}>
       {/* Indigo radial gradient fon — provayder UI palitrasi (primary indigo) */}
-      <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
         <Defs>
           <RadialGradient id="vqIntroBg" cx="50%" cy="34%" r="90%">
             <Stop offset="0%" stopColor="#7c86f2" />
@@ -224,7 +224,7 @@ export function VaqtdaIntro({
 
       <Animated.View
         style={{
-          ...StyleSheet.absoluteFillObject,
+          ...StyleSheet.absoluteFill,
           alignItems: "center",
           justifyContent: "center",
           transform: [{ scale: sceneScale }],

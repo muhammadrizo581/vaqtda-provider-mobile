@@ -2,6 +2,7 @@
 // Yo'naltirish (redirect) bu yerda emas, app/_layout.tsx dagi guard'da qilinadi.
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { clearPushToken } from "@/lib/push";
+import { clearAllCache } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 
 interface User {
@@ -204,6 +205,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     // Chiqishdan oldin push token tozalanadi — eski qurilmaga xabar bormasin
     if (user) await clearPushToken(user.id);
+    await clearAllCache();
     await supabase.auth.signOut();
     setUser(null);
     setIsAuthenticated(false);

@@ -12,6 +12,7 @@ import { Card, ClientAvatar, EmptyState, PageHeader, Spinner } from "@/component
 import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
+import { getMemoryCache, readCache, writeCache, TTL_DYNAMIC } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 import { formatChatTime, isImageText } from "@/utils/chat";
 
@@ -32,22 +33,41 @@ function ChatListContent() {
   const { provider } = useProvider();
   const router = useRouter();
   const providerId = provider?.id || null;
+  const cacheKey = providerId ? `chat_list.${providerId}` : "";
 
-  const [conversations, setConversations] = useState<ChatConversation[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 1. RAM xotiradan sinxron o'qish (0ms instant)
+  const initialCache = cacheKey ? getMemoryCache<ChatConversation[]>(cacheKey) : null;
+
+  const [conversations, setConversations] = useState<ChatConversation[]>(initialCache ?? []);
+  const [loading, setLoading] = useState<boolean>(!initialCache);
 
   const load = useCallback(async () => {
     if (!providerId) return;
-    const { data } = await supabase
-      .from("chat_conversations")
-      .select(
-        "id, provider_id, client_id, last_message_at, last_message_text, provider_unread, client:profiles(full_name, avatar_url)"
-      )
-      .eq("provider_id", providerId)
-      .order("last_message_at", { ascending: false });
-    setConversations((data as unknown as ChatConversation[]) || []);
-    setLoading(false);
-  }, [providerId]);
+
+    // Disk keshni tekshirish
+    const cached = await readCache<ChatConversation[]>(cacheKey);
+    if (cached && cached.length > 0) {
+      setConversations(cached);
+      setLoading(false);
+    }
+
+    try {
+      const { data } = await supabase
+        .from("chat_conversations")
+        .select(
+          "id, provider_id, client_id, last_message_at, last_message_text, provider_unread, client:profiles(full_name, avatar_url)"
+        )
+        .eq("provider_id", providerId)
+        .order("last_message_at", { ascending: false });
+      const fresh = (data as unknown as ChatConversation[]) || [];
+      setConversations(fresh);
+      await writeCache(cacheKey, fresh, TTL_DYNAMIC);
+    } catch {
+      // Tarmoq xatosi bo'lsa kesh saqlanadi
+    } finally {
+      setLoading(false);
+    }
+  }, [providerId, cacheKey]);
 
   // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
   useEffect(() => {

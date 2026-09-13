@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useStaffRoleContext } from "@/context/StaffRoleContext";
+import { getMemoryCache, readCache, writeCache, TTL_PROFILE } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 
 export interface ProviderProfile {
@@ -34,6 +35,15 @@ export interface ProviderProfile {
   prepayment_type?: "none" | "percent" | "fixed" | "full" | null;
   prepayment_percent?: number | null;
   prepayment_amount?: number | null;
+
+  // Tarif (subscription): 60 kunlik bepul PRO sinov, keyin PLUS/PRO — hozircha
+  // ruchnoy tasdiqlanadi (to'lov tizimi ulanmagunicha). plan.tsx shu maydonlarni ishlatadi.
+  plan_code?: "plus" | "pro" | null;
+  subscription_status?: "trial" | "active" | "expired" | null;
+  trial_ends_at?: string | null;
+  plan_started_at?: string | null;
+  plan_expires_at?: string | null;
+
   // Ichki hisob raqam (wallet) — tolov-hisob.sql beradi
   account_number?: string | null;
 }
@@ -42,8 +52,16 @@ export function useProviderProfile() {
   const { user } = useAuth();
   const userId = user?.id;
   const { loading: roleLoading, isStaff, staffProviderId } = useStaffRoleContext();
-  const [provider, setProvider] = useState<ProviderProfile | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const cacheKey = userId
+    ? `provider.${userId}.${isStaff ? staffProviderId || "unknown" : "owner"}`
+    : "";
+
+  // 1. RAM xotiradan sinxron o'qish (0ms instant render)
+  const [provider, setProvider] = useState<ProviderProfile | null>(() =>
+    cacheKey ? getMemoryCache<ProviderProfile>(cacheKey) : null
+  );
+  const [loading, setLoading] = useState<boolean>(() => !provider);
 
   const load = useCallback(async () => {
     // Rol aniqlanmaguncha kutamiz — aks holda xodimga "biznesingiz yo'q"
@@ -54,15 +72,38 @@ export function useProviderProfile() {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    const base = supabase.from("providers").select("*");
-    // Xodim — o'zi ishlaydigan klinika; ega — o'z biznesi
-    const { data } =
-      isStaff && staffProviderId
-        ? await base.eq("id", staffProviderId).maybeSingle()
-        : await base.eq("user_id", userId).maybeSingle();
-    setProvider((data as ProviderProfile) || null);
-    setLoading(false);
+
+    const key = `provider.${userId}.${isStaff ? staffProviderId || "unknown" : "owner"}`;
+
+    // Agar RAM bo'sh bo'lsa, tezda diskdagi keshni o'qib ko'rsatamiz (foydalanuvchi kutmasligi uchun)
+    const cached = await readCache<ProviderProfile>(key);
+    if (cached) {
+      setProvider(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const base = supabase.from("providers").select("*");
+      // Xodim — o'zi ishlaydigan klinika; ega — o'z biznesi
+      const result =
+        isStaff && staffProviderId
+          ? await base.eq("id", staffProviderId).maybeSingle()
+          : await base.eq("user_id", userId).maybeSingle();
+      if (result.error) throw result.error;
+      const fresh = (result.data as ProviderProfile) || null;
+      setProvider(fresh);
+      if (fresh) await writeCache(key, fresh, TTL_PROFILE);
+    } catch {
+      // Tarmoq xatosi bo'lsa va disk kesh bo'lsa, ushlab qolamiz
+      if (!cached) {
+        const fallback = await readCache<ProviderProfile>(key);
+        if (fallback) setProvider(fallback);
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [userId, roleLoading, isStaff, staffProviderId]);
 
   // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun

@@ -35,6 +35,7 @@ import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useAppointments, type Appointment } from "@/hooks/useAppointments";
 import { useWaitlistEntries } from "@/hooks/useWaitlistEntries";
 import { useWallet } from "@/hooks/useWallet";
+import { getMemoryCache, readCache, writeCache, TTL_DYNAMIC } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 import { formatSom } from "@/utils/price";
 import { addDaysStr, createTashkentClock, formatUzDate } from "@/utils/tashkent";
@@ -48,7 +49,12 @@ const toMin = (t?: string | null) => {
   return (h || 0) * 60 + (m || 0);
 };
 
-// Bugungi jadval slotlari — bandlik foizi uchun.
+interface SlotItem {
+  start_time: string;
+  end_time: string;
+}
+
+// Bugungi jadval slotlari — bandlik foizi uchun (RAM va Disk kesh bilan tezkor).
 // Xodim (usta/shifokor) kirgan bo'lsa faqat O'Z slotlari olinadi (RLS ham shunday beradi).
 function useTodaySlots(today: string, staffId: string | null) {
   const { provider } = useProvider();
@@ -56,25 +62,47 @@ function useTodaySlots(today: string, staffId: string | null) {
   // Klinikada jadval "shared" rejimida butun biznesga umumiy bo'ladi — u holda
   // xodimning ish vaqti staff_id NULL bo'lgan qatorlarda turadi.
   const sharedSchedule = provider?.schedule_mode === "shared";
-  const [slots, setSlots] = useState<{ start_time: string; end_time: string }[]>([]);
+  const cacheKey = providerId ? `today_slots.${providerId}.${today}.${staffId || "all"}.${sharedSchedule}` : "";
+
+  // 1. RAM xotiradan sinxron o'qish (0ms instant)
+  const initialCache = cacheKey ? getMemoryCache<SlotItem[]>(cacheKey) : null;
+  const [slots, setSlots] = useState<SlotItem[]>(initialCache ?? []);
+
   useEffect(() => {
     if (!providerId) return;
     let cancelled = false;
+
     const timer = setTimeout(async () => {
-      let q = supabase
-        .from("timetable_slots")
-        .select("start_time, end_time")
-        .eq("provider_id", providerId)
-        .eq("slot_date", today);
-      if (staffId) q = sharedSchedule ? q.is("staff_id", null) : q.eq("staff_id", staffId);
-      const { data } = await q;
-      if (!cancelled) setSlots((data as { start_time: string; end_time: string }[]) || []);
+      // Disk keshni tekshirish
+      const cached = await readCache<SlotItem[]>(cacheKey);
+      if (cached && !cancelled) {
+        setSlots(cached);
+      }
+
+      try {
+        let q = supabase
+          .from("timetable_slots")
+          .select("start_time, end_time")
+          .eq("provider_id", providerId)
+          .eq("slot_date", today);
+        if (staffId) q = sharedSchedule ? q.is("staff_id", null) : q.eq("staff_id", staffId);
+        const { data } = await q;
+        if (!cancelled) {
+          const fresh = (data as SlotItem[]) || [];
+          setSlots(fresh);
+          await writeCache(cacheKey, fresh, TTL_DYNAMIC);
+        }
+      } catch {
+        // Tarmoq xatosi bo'lsa kesh saqlanadi
+      }
     }, 0);
+
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [providerId, today, staffId, sharedSchedule]);
+  }, [providerId, today, staffId, sharedSchedule, cacheKey]);
+
   return slots;
 }
 

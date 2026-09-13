@@ -9,6 +9,7 @@
 //   ikkalasi ham false — hali biznes ham yaratmagan, taklif kodi ham kiritmagan
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { getMemoryCache, readCache, writeCache, TTL_PROFILE } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 
 export interface StaffRole {
@@ -23,15 +24,26 @@ export interface StaffRole {
   reload: () => Promise<void>;
 }
 
+interface StaffRoleCache {
+  isOwner: boolean;
+  staffId: string | null;
+  staffProviderId: string | null;
+  staffName: string | null;
+}
+
 export function useStaffRole(): StaffRole {
   const { user } = useAuth();
   const userId = user?.id || null;
+  const cacheKey = userId ? `role.${userId}` : "";
 
-  const [loading, setLoading] = useState(true);
-  const [isOwner, setIsOwner] = useState(false);
-  const [staffId, setStaffId] = useState<string | null>(null);
-  const [staffProviderId, setStaffProviderId] = useState<string | null>(null);
-  const [staffName, setStaffName] = useState<string | null>(null);
+  // 1. RAM xotiradan sinxron o'qish (0ms instant)
+  const initialCache = cacheKey ? getMemoryCache<StaffRoleCache>(cacheKey) : null;
+
+  const [loading, setLoading] = useState<boolean>(!initialCache && !!userId);
+  const [isOwner, setIsOwner] = useState<boolean>(initialCache?.isOwner ?? false);
+  const [staffId, setStaffId] = useState<string | null>(initialCache?.staffId ?? null);
+  const [staffProviderId, setStaffProviderId] = useState<string | null>(initialCache?.staffProviderId ?? null);
+  const [staffName, setStaffName] = useState<string | null>(initialCache?.staffName ?? null);
 
   const load = useCallback(async () => {
     if (!userId) {
@@ -42,40 +54,64 @@ export function useStaffRole(): StaffRole {
       setStaffName(null);
       return;
     }
-    setLoading(true);
 
-    // 1) O'z biznesi bormi (egasi)?
-    const { data: own } = await supabase
-      .from("providers")
-      .select("id")
-      .eq("user_id", userId)
-      .maybeSingle();
-    const owner = !!own?.id;
-    setIsOwner(owner);
-
-    // 2) Egasi bo'lmasa — biror klinikaga biriktirilgan shifokormi?
-    if (!owner) {
-      const { data: staff } = await supabase
-        .from("provider_staff")
-        .select("id, provider_id, full_name")
-        .eq("user_id", userId)
-        .eq("is_active", true)
-        .order("created_at", { ascending: true })
-        .maybeSingle();
-      setStaffId(staff?.id ?? null);
-      setStaffProviderId(staff?.provider_id ?? null);
-      setStaffName(staff?.full_name ?? null);
-    } else {
-      setStaffId(null);
-      setStaffProviderId(null);
-      setStaffName(null);
+    // Disk keshni tekshirish
+    const cached = await readCache<StaffRoleCache>(cacheKey);
+    if (cached) {
+      setIsOwner(cached.isOwner);
+      setStaffId(cached.staffId);
+      setStaffProviderId(cached.staffProviderId);
+      setStaffName(cached.staffName);
+      setLoading(false);
     }
 
-    setLoading(false);
-  }, [userId]);
+    try {
+      // 1) O'z biznesi bormi (egasi)?
+      const { data: own } = await supabase
+        .from("providers")
+        .select("id")
+        .eq("user_id", userId)
+        .maybeSingle();
+      const owner = !!own?.id;
+      setIsOwner(owner);
+
+      let sid: string | null = null;
+      let spid: string | null = null;
+      let sname: string | null = null;
+
+      // 2) Egasi bo'lmasa — biror klinikaga biriktirilgan shifokormi?
+      if (!owner) {
+        const { data: staff } = await supabase
+          .from("provider_staff")
+          .select("id, provider_id, full_name")
+          .eq("user_id", userId)
+          .eq("is_active", true)
+          .order("created_at", { ascending: true })
+          .maybeSingle();
+        sid = staff?.id ?? null;
+        spid = staff?.provider_id ?? null;
+        sname = staff?.full_name ?? null;
+      }
+
+      setStaffId(sid);
+      setStaffProviderId(spid);
+      setStaffName(sname);
+
+      const record: StaffRoleCache = {
+        isOwner: owner,
+        staffId: sid,
+        staffProviderId: spid,
+        staffName: sname,
+      };
+      await writeCache(cacheKey, record, TTL_PROFILE);
+    } catch {
+      // Tarmoq xatosi bo'lsa kesh saqlanadi
+    } finally {
+      setLoading(false);
+    }
+  }, [userId, cacheKey]);
 
   useEffect(() => {
-    // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
     const timer = setTimeout(load, 0);
     return () => clearTimeout(timer);
   }, [load]);

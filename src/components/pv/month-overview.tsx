@@ -41,10 +41,12 @@ export function MonthOverviewModal({
 
   // Ochilganda joriy oy + bugun tanlangan holatga qaytadi
   useEffect(() => {
-    if (visible) {
+    if (!visible) return;
+    const reset = setTimeout(() => {
       setYm(today.slice(0, 7));
       setSelected(today);
-    }
+    }, 0);
+    return () => clearTimeout(reset);
   }, [visible, today]);
 
   const [year, month] = ym.split("-").map(Number);

@@ -9,7 +9,9 @@
     "userInterfaceStyle": "automatic",
     "backgroundColor": "#0b0d12",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "bundleIdentifier": "com.vaqtda.provider",
+      "icon": "./assets/expo.icon",
+      "supportsTablet": false
     },
     "android": {
       "package": "com.vaqtda.provider",
@@ -42,7 +44,21 @@
         {
           "color": "#4C8156"
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Vaqtda profil va xizmat rasmlarini tanlash uchun galereyaga ruxsat kerak."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Biznesingiz manzilini xaritada aniq belgilash uchun joylashuvga ruxsat kerak."
+        }
+      ],
+      "expo-image",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

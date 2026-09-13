@@ -14,10 +14,18 @@
 // kodlarni buzmaslik uchun alias sifatida qaytariladi.
 import { useEffect, useState } from "react";
 import { useProvider } from "@/context/ProviderContext";
+import { getMemoryCache, readCache, writeCache, TTL_CONFIG } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 
 export type BookingMode = "slots" | "table" | "daily";
 export type TableUnit = "table" | "computer";
+
+interface BookingModeCache {
+  mode: BookingMode;
+  unit: TableUnit;
+  usesDepartments: boolean;
+  usesStaff: boolean;
+}
 
 export function useBookingMode(): {
   mode: BookingMode;
@@ -30,39 +38,72 @@ export function useBookingMode(): {
 } {
   const { provider } = useProvider();
   const categoryId = provider?.category_id;
-  const [mode, setMode] = useState<BookingMode>("slots");
-  const [unit, setUnit] = useState<TableUnit>("table");
-  const [usesDepartments, setUsesDepartments] = useState(false);
-  const [usesStaff, setUsesStaff] = useState(false);
-  const [loading, setLoading] = useState(!!categoryId);
+  const cacheKey = categoryId ? `category.mode.${categoryId}` : "";
+
+  // 1. RAM xotiradan sinxron o'qish (0ms instant)
+  const initialCache = cacheKey ? getMemoryCache<BookingModeCache>(cacheKey) : null;
+
+  const [mode, setMode] = useState<BookingMode>(initialCache?.mode ?? "slots");
+  const [unit, setUnit] = useState<TableUnit>(initialCache?.unit ?? "table");
+  const [usesDepartments, setUsesDepartments] = useState<boolean>(initialCache?.usesDepartments ?? false);
+  const [usesStaff, setUsesStaff] = useState<boolean>(initialCache?.usesStaff ?? false);
+  const [loading, setLoading] = useState<boolean>(!initialCache && !!categoryId);
 
   useEffect(() => {
     if (!categoryId) return;
     let cancelled = false;
-    // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
+
     const timer = setTimeout(async () => {
-      setLoading(true);
-      // select("*") — table_unit / uses_departments / uses_staff ustunlari hali
-      // qo'shilmagan bo'lsa ham xato bermaydi
-      const { data } = await supabase
-        .from("categories")
-        .select("*")
-        .eq("id", categoryId)
-        .maybeSingle();
-      if (cancelled) return;
-      const m = data?.booking_mode;
-      setMode(m === "table" || m === "daily" ? m : "slots");
-      setUnit(data?.table_unit === "computer" ? "computer" : "table");
-      setUsesDepartments(data?.uses_departments === true);
-      // Bazada bayroq nomi — categories.uses_staff (usta/shifokor ishlatiladimi)
-      setUsesStaff(data?.uses_staff === true);
-      setLoading(false);
+      // Disk keshni tezkor tekshiramiz
+      const cached = await readCache<BookingModeCache>(cacheKey);
+      if (cached && !cancelled) {
+        setMode(cached.mode);
+        setUnit(cached.unit);
+        setUsesDepartments(cached.usesDepartments);
+        setUsesStaff(cached.usesStaff);
+        setLoading(false);
+      }
+
+      // Supabase'dan yangilash (fon rejimida)
+      try {
+        const { data } = await supabase
+          .from("categories")
+          .select("*")
+          .eq("id", categoryId)
+          .maybeSingle();
+
+        if (cancelled) return;
+
+        const m = data?.booking_mode;
+        const freshMode: BookingMode = m === "table" || m === "daily" ? m : "slots";
+        const freshUnit: TableUnit = data?.table_unit === "computer" ? "computer" : "table";
+        const freshDepts = data?.uses_departments === true;
+        const freshStaff = data?.uses_staff === true;
+
+        setMode(freshMode);
+        setUnit(freshUnit);
+        setUsesDepartments(freshDepts);
+        setUsesStaff(freshStaff);
+
+        const record: BookingModeCache = {
+          mode: freshMode,
+          unit: freshUnit,
+          usesDepartments: freshDepts,
+          usesStaff: freshStaff,
+        };
+        await writeCache(cacheKey, record, TTL_CONFIG);
+      } catch {
+        // Tarmoq xatosi bo'lsa kesh yetarli
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }, 0);
+
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [categoryId]);
+  }, [categoryId, cacheKey]);
 
   return { mode, unit, usesDepartments, usesStaff, hasWorkers: usesStaff, loading };
 }
