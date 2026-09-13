@@ -7,7 +7,7 @@
 // biznesga tegishli bo'lgani uchun yashiriladi, o'rniga o'z bo'limidagi jonli
 // navbat (queue) ko'rsatiladi; qolgan bo'limlar o'z ma'lumoti bilan ishlaydi.
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { Badge, Icon, Label, NativeTabs, VectorIcon } from "expo-router/unstable-native-tabs";
+import { NativeTabs } from "expo-router/unstable-native-tabs";
 import React from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import { useStaffRoleContext } from "@/context/StaffRoleContext";
@@ -23,40 +23,40 @@ export default function TabsLayout() {
   return (
     <NativeTabs tintColor={colors.primary}>
       <NativeTabs.Trigger name="index">
-        <Icon
+        <NativeTabs.Trigger.Icon
           sf={{ default: "square.grid.2x2", selected: "square.grid.2x2.fill" }}
-          androidSrc={<VectorIcon family={MaterialIcons} name="dashboard" />}
+          src={<NativeTabs.Trigger.VectorIcon family={MaterialIcons} name="dashboard" />}
         />
-        <Label>{t("pv.nav_dashboard")}</Label>
+        <NativeTabs.Trigger.Label>{t("pv.nav_dashboard")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="appointments">
-        <Icon sf="calendar" androidSrc={<VectorIcon family={MaterialIcons} name="calendar-month" />} />
-        <Label>{t("pv.nav_appointments")}</Label>
+        <NativeTabs.Trigger.Icon sf="calendar" src={<NativeTabs.Trigger.VectorIcon family={MaterialIcons} name="calendar-month" />} />
+        <NativeTabs.Trigger.Label>{t("pv.nav_appointments")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="chat">
-        <Icon
+        <NativeTabs.Trigger.Icon
           sf={{ default: "message", selected: "message.fill" }}
-          androidSrc={<VectorIcon family={MaterialIcons} name="chat" />}
+          src={<NativeTabs.Trigger.VectorIcon family={MaterialIcons} name="chat" />}
         />
-        <Label>{t("pv.nav_chat")}</Label>
-        {chatUnread > 0 && <Badge>{chatUnread > 99 ? "99+" : String(chatUnread)}</Badge>}
+        <NativeTabs.Trigger.Label>{t("pv.nav_chat")}</NativeTabs.Trigger.Label>
+        {chatUnread > 0 && <NativeTabs.Trigger.Badge>{chatUnread > 99 ? "99+" : String(chatUnread)}</NativeTabs.Trigger.Badge>}
       </NativeTabs.Trigger>
       {/* Navbat — butun biznes bo'yicha; shifokorga ko'rsatilmaydi */}
       <NativeTabs.Trigger name="waitlist" hidden={isStaff}>
-        <Icon sf="hourglass" androidSrc={<VectorIcon family={MaterialIcons} name="hourglass-empty" />} />
-        <Label>{t("pv.nav_waitlist")}</Label>
+        <NativeTabs.Trigger.Icon sf="hourglass" src={<NativeTabs.Trigger.VectorIcon family={MaterialIcons} name="hourglass-empty" />} />
+        <NativeTabs.Trigger.Label>{t("pv.nav_waitlist")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       {/* Navbat — faqat shifokor uchun, o'z bo'limidagi jonli navbat */}
       <NativeTabs.Trigger name="queue" hidden={!isStaff}>
-        <Icon sf="stethoscope" androidSrc={<VectorIcon family={MaterialIcons} name="hourglass-top" />} />
-        <Label>{t("pv.nav_queue")}</Label>
+        <NativeTabs.Trigger.Icon sf="stethoscope" src={<NativeTabs.Trigger.VectorIcon family={MaterialIcons} name="hourglass-top" />} />
+        <NativeTabs.Trigger.Label>{t("pv.nav_queue")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="more">
-        <Icon
+        <NativeTabs.Trigger.Icon
           sf={{ default: "ellipsis.circle", selected: "ellipsis.circle.fill" }}
-          androidSrc={<VectorIcon family={MaterialIcons} name="more-horiz" />}
+          src={<NativeTabs.Trigger.VectorIcon family={MaterialIcons} name="more-horiz" />}
         />
-        <Label>{t("pv.nav_more")}</Label>
+        <NativeTabs.Trigger.Label>{t("pv.nav_more")}</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );

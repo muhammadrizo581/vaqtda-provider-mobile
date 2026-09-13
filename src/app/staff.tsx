@@ -45,6 +45,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
 import { useBookingMode } from "@/hooks/useBookingMode";
+import { getMemoryCache, invalidateCache, readCache, writeCache, TTL_SERVICES } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
 import { translateMultilingual } from "@/utils/translate";
@@ -96,10 +97,15 @@ function StaffContent() {
   const { usesDepartments, loading: modeLoading } = useBookingMode();
   const providerId = provider?.id || null;
   const userId = provider?.user_id || null;
+  const staffCacheKey = providerId ? `staff.${providerId}` : "";
 
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 1. RAM xotiradan sinxron o'qish (0ms instant)
+  const initialStaff = staffCacheKey ? getMemoryCache<Staff[]>(staffCacheKey) : null;
+  const initialDepts = providerId ? getMemoryCache<Department[]>(`departments.${providerId}`) : null;
+
+  const [staff, setStaff] = useState<Staff[]>(initialStaff ?? []);
+  const [departments, setDepartments] = useState<Department[]>(initialDepts ?? []);
+  const [loading, setLoading] = useState<boolean>(!initialStaff);
   // Migratsiya hali qo'llanmagan bo'lsa (jadval yo'q) — sahifa xato bermay yopiladi
   const [unavailable, setUnavailable] = useState(false);
 
@@ -154,7 +160,16 @@ function StaffContent() {
 
   const load = useCallback(async () => {
     if (!providerId) return;
-    setLoading(true);
+
+    // Disk keshni tekshirish
+    if (staffCacheKey) {
+      const cachedStaff = await readCache<Staff[]>(staffCacheKey);
+      if (cachedStaff && cachedStaff.length > 0) {
+        setStaff(cachedStaff);
+        setLoading(false);
+      }
+    }
+
     // select("*") — ustunlar to'plami o'zgarsa ham xato bermaydi
     const { data, error } = await supabase
       .from("provider_staff")
@@ -163,7 +178,9 @@ function StaffContent() {
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
     setUnavailable(!!error);
-    setStaff((data as Staff[]) || []);
+    const freshStaff = (data as Staff[]) || [];
+    setStaff(freshStaff);
+    if (staffCacheKey) writeCache(staffCacheKey, freshStaff, TTL_SERVICES).catch(() => {});
 
     // Bo'limlar — guruhlash va tanlov uchun (jadval yo'q bo'lsa bo'sh qoladi)
     const { data: deps } = await supabase
@@ -172,11 +189,13 @@ function StaffContent() {
       .eq("provider_id", providerId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
-    setDepartments((deps as Department[]) || []);
+    const freshDeps = (deps as Department[]) || [];
+    setDepartments(freshDeps);
+    writeCache(`departments.${providerId}`, freshDeps, TTL_SERVICES).catch(() => {});
 
     await loadCreds();
     setLoading(false);
-  }, [providerId, loadCreds]);
+  }, [providerId, loadCreds, staffCacheKey]);
 
   // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
   useEffect(() => {
@@ -323,6 +342,7 @@ function StaffContent() {
       }
       showToast(t("svc.saved"));
       resetForm();
+      if (providerId) invalidateCache(`staff.${providerId}`).catch(() => {});
       await load();
     } catch (e) {
       console.error("staff save failed:", e);
@@ -339,19 +359,33 @@ function StaffContent() {
       showToast(t("svc.save_failed"), "error");
       return;
     }
-    setStaff((prev) => prev.filter((s) => s.id !== id));
+    setStaff((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      if (staffCacheKey) writeCache(staffCacheKey, next, TTL_SERVICES).catch(() => {});
+      return next;
+    });
+    if (providerId) invalidateCache(`staff.${providerId}`).catch(() => {});
     showToast(t("svc.deleted"));
   };
 
   const toggleActive = async (s: Staff) => {
     const next = !s.is_active;
-    setStaff((prev) => prev.map((x) => (x.id === s.id ? { ...x, is_active: next } : x)));
+    setStaff((prev) => {
+      const updated = prev.map((x) => (x.id === s.id ? { ...x, is_active: next } : x));
+      if (staffCacheKey) writeCache(staffCacheKey, updated, TTL_SERVICES).catch(() => {});
+      return updated;
+    });
+    if (providerId) invalidateCache(`staff.${providerId}`).catch(() => {});
     const { error } = await supabase
       .from("provider_staff")
       .update({ is_active: next })
       .eq("id", s.id);
     if (error) {
-      setStaff((prev) => prev.map((x) => (x.id === s.id ? { ...x, is_active: s.is_active } : x)));
+      setStaff((prev) => {
+        const reverted = prev.map((x) => (x.id === s.id ? { ...x, is_active: s.is_active } : x));
+        if (staffCacheKey) writeCache(staffCacheKey, reverted, TTL_SERVICES).catch(() => {});
+        return reverted;
+      });
       showToast(t("svc.save_failed"), "error");
     }
   };

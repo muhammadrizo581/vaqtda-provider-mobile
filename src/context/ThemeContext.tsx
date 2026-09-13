@@ -47,7 +47,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setModeState(next);
     AsyncStorage.setItem(STORAGE_KEY, next).catch(() => {});
     try {
-      Appearance.setColorScheme(next === "system" ? null : next);
+      // RN runtime'da null native override'ni tozalab system sxemasiga qaytaradi;
+      // 0.86 typings bu documented null qiymatini hali ifodalamaydi.
+      Appearance.setColorScheme((next === "system" ? null : next) as Parameters<typeof Appearance.setColorScheme>[0]);
     } catch {
       // web'da setColorScheme bo'lmasligi mumkin
     }
@@ -57,7 +59,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // app'dagi tanlovga ergashsin — aks holda ular system rejimiga qarab chiziladi
   useEffect(() => {
     try {
-      Appearance.setColorScheme(mode === "system" ? null : mode);
+      Appearance.setColorScheme((mode === "system" ? null : mode) as Parameters<typeof Appearance.setColorScheme>[0]);
     } catch {
       // web'da setColorScheme bo'lmasligi mumkin — e'tiborsiz qoldiramiz
     }

@@ -46,13 +46,16 @@ export default function PaymentSettingsScreen() {
   // Joriy sozlamani formaga yuklaymiz
   useEffect(() => {
     if (!provider) return;
-    const type = provider.prepayment_type || "none";
-    setMode(type === "percent" || type === "fixed" ? "partial" : type);
-    setUnit(type === "fixed" ? "som" : "percent");
-    const p = Number(provider.prepayment_percent) || 30;
-    setPercentText(String(Math.min(PERCENT_MAX, Math.max(PERCENT_MIN, p))));
-    const a = Number(provider.prepayment_amount) || 10000;
-    setAmountDigits(String(Math.max(AMOUNT_MIN, Math.round(a))));
+    const reset = setTimeout(() => {
+      const type = provider.prepayment_type || "none";
+      setMode(type === "percent" || type === "fixed" ? "partial" : type);
+      setUnit(type === "fixed" ? "som" : "percent");
+      const p = Number(provider.prepayment_percent) || 30;
+      setPercentText(String(Math.min(PERCENT_MAX, Math.max(PERCENT_MIN, p))));
+      const a = Number(provider.prepayment_amount) || 10000;
+      setAmountDigits(String(Math.max(AMOUNT_MIN, Math.round(a))));
+    }, 0);
+    return () => clearTimeout(reset);
   }, [provider]);
 
   const options: { value: Mode; icon: LucideIcon; title: string; desc: string }[] = [

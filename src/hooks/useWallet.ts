@@ -1,7 +1,6 @@
-// Provayder hamyoni (wallet) — provider_wallet view'idan (tolov-hisob.sql).
-// Hisob raqam + yig'ilgan summalar (naqd/online ajratilgan).
 import { useCallback, useEffect, useState } from "react";
 import { useProvider } from "@/context/ProviderContext";
+import { getMemoryCache, readCache, writeCache, TTL_WALLET } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 
 export interface Wallet {
@@ -15,22 +14,35 @@ export interface Wallet {
 export function useWallet() {
   const { provider } = useProvider();
   const providerId = provider?.id;
-  const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = providerId ? `wallet.${providerId}` : "";
+
+  // 1. RAM xotiradan sinxron o'qish (0ms instant)
+  const initialCache = cacheKey ? getMemoryCache<Wallet>(cacheKey) : null;
+
+  const [wallet, setWallet] = useState<Wallet | null>(initialCache);
+  const [loading, setLoading] = useState<boolean>(!initialCache);
 
   const load = useCallback(async () => {
     if (!providerId) {
       setLoading(false);
       return;
     }
-    setLoading(true);
-    const { data } = await supabase
-      .from("provider_wallet")
-      .select("account_number, earned_total, online_collected, cash_collected, paid_count")
-      .eq("provider_id", providerId)
-      .maybeSingle();
-    setWallet(
-      data
+
+    // Disk keshni tekshirish
+    const cached = await readCache<Wallet>(cacheKey);
+    if (cached) {
+      setWallet(cached);
+      setLoading(false);
+    }
+
+    try {
+      const { data } = await supabase
+        .from("provider_wallet")
+        .select("account_number, earned_total, online_collected, cash_collected, paid_count")
+        .eq("provider_id", providerId)
+        .maybeSingle();
+
+      const fresh: Wallet = data
         ? {
             account_number: data.account_number ?? provider?.account_number ?? null,
             earned_total: Number(data.earned_total || 0),
@@ -45,10 +57,16 @@ export function useWallet() {
             online_collected: 0,
             cash_collected: 0,
             paid_count: 0,
-          }
-    );
-    setLoading(false);
-  }, [providerId, provider?.account_number]);
+          };
+
+      setWallet(fresh);
+      await writeCache(cacheKey, fresh, TTL_WALLET);
+    } catch {
+      // Tarmoq xatosi bo'lsa kesh saqlanadi
+    } finally {
+      setLoading(false);
+    }
+  }, [providerId, provider, cacheKey]);
 
   useEffect(() => {
     const t = setTimeout(load, 0);

@@ -9,20 +9,18 @@ import {
   Armchair,
   BarChart3,
   Building2,
-  CalendarDays,
+  CalendarClock,
   ChevronRight,
   CreditCard,
-  Crown,
+  Layers,
   LogIn,
   LogOut,
   Monitor,
   Settings,
+  Sparkles,
   Stethoscope,
-  Store,
-  Tag,
-  Users,
+  UserCheck,
   UtensilsCrossed,
-  Wallet,
   type LucideIcon,
 } from "lucide-react-native";
 import React from "react";
@@ -92,13 +90,13 @@ export default function MoreScreen() {
         ? t("pv.more_computers_sub")
         : t("pv.more_tables_sub")
       : t("pv.more_services_sub");
-  const ServicesIcon = mode === "table" ? (unit === "computer" ? Monitor : Armchair) : Tag;
+  const ServicesIcon = mode === "table" ? (unit === "computer" ? Monitor : Armchair) : Sparkles;
 
   // Biznes egasi uchun to'liq ro'yxat
   const ownerItems: MoreItem[] = [
     {
       key: "profile",
-      icon: Store,
+      icon: Building2,
       title: t("pv.more_profile"),
       subtitle: t("pv.more_profile_sub"),
       href: "/business-profile" as Href,
@@ -106,7 +104,7 @@ export default function MoreScreen() {
     },
     {
       key: "schedule",
-      icon: CalendarDays,
+      icon: CalendarClock,
       title: t("pv.nav_schedule"),
       // "Har kimga alohida" rejimida rahbar jadvalni faqat ko'radi
       subtitle:
@@ -119,7 +117,7 @@ export default function MoreScreen() {
       ? [
           {
             key: "departments",
-            icon: Building2,
+            icon: Layers,
             title: t("dep.nav"),
             subtitle: t("dep.more_sub"),
             href: "/departments" as Href,
@@ -148,12 +146,12 @@ export default function MoreScreen() {
       href: "/services" as Href,
       tone: "secondary",
     },
-    // Ustalar (sartaroshxona kabi bizneslar): usta qo'shish + login yaratish
+    // Ishchilar (sartaroshxona kabi bizneslar): ishchi qo'shish + login yaratish
     ...(showWorkersScreen
       ? [
           {
             key: "workers",
-            icon: Users,
+            icon: UserCheck,
             title: t("pv.nav_workers"),
             subtitle: t("pv.more_workers_sub"),
             href: "/workers" as Href,
@@ -175,24 +173,8 @@ export default function MoreScreen() {
         ]
       : []),
     {
-      key: "plan",
-      icon: Crown,
-      title: t("pv.more_plan"),
-      subtitle: t("pv.more_plan_sub"),
-      href: "/plan" as Href,
-      tone: "tertiary",
-    },
-    {
-      key: "cards",
-      icon: CreditCard,
-      title: t("pv.more_cards"),
-      subtitle: t("pv.more_cards_sub"),
-      href: "/cards" as Href,
-      tone: "primary",
-    },
-    {
       key: "paycfg",
-      icon: Wallet,
+      icon: CreditCard,
       title: t("pv.more_paycfg"),
       subtitle: t("pv.more_paycfg_sub"),
       href: "/payment-settings" as Href,
@@ -222,7 +204,7 @@ export default function MoreScreen() {
   const staffItems: MoreItem[] = [
     {
       key: "schedule",
-      icon: CalendarDays,
+      icon: CalendarClock,
       title: sharedSchedule ? t("sch.business_title") : t("stf.my_schedule"),
       subtitle: sharedSchedule ? t("sch.more_shared_sub") : t("stf.my_schedule_sub"),
       href: "/schedule" as Href,
@@ -231,7 +213,7 @@ export default function MoreScreen() {
     // Xizmatlarni xodim o'zi qo'shadi (services.worker_id)
     {
       key: "services",
-      icon: Tag,
+      icon: Sparkles,
       title: t("svc.my_title"),
       subtitle: t("pv.more_services_sub"),
       href: "/services" as Href,
@@ -247,7 +229,7 @@ export default function MoreScreen() {
     },
     {
       key: "profile",
-      icon: Store,
+      icon: Building2,
       title: t("pv.more_profile"),
       subtitle: t("biz.readonly_sub"),
       href: "/business-profile" as Href,

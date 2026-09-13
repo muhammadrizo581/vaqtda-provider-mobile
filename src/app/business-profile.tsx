@@ -8,7 +8,7 @@
 import * as ImagePicker from "expo-image-picker";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { ArrowLeft, Camera, Lock, Star, X } from "lucide-react-native";
+import { ArrowLeft, Camera, ChevronRight, Crown, Lock, Star, X } from "lucide-react-native";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -23,6 +23,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AnimatedLogo } from "@/components/animated-logo";
+import { CategoryPicker, type CategoryItem } from "@/components/pv/category-picker";
 import { LocationPicker } from "@/components/pv/location-picker";
 import { SelectField } from "@/components/pv/select-field";
 import { useToast } from "@/components/pv/toast";
@@ -33,6 +34,7 @@ import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { useProvider } from "@/context/ProviderContext";
 import { useStaffRoleContext } from "@/context/StaffRoleContext";
+import { getMemoryCache, invalidateCache, readCache, writeCache, TTL_STATIC } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
 import { translateMultilingual } from "@/utils/translate";
@@ -91,9 +93,16 @@ export default function BusinessProfileScreen() {
 
   const [businessName, setBusinessName] = useState("");
   const [slug, setSlug] = useState("");
-  const [categories, setCategories] = useState<{ id: string; name: any }[]>([]);
-  const [selectedCategoryId, setSelectedCategoryId] = useState("");
-  const [regions, setRegions] = useState<{ id: string; name: string }[]>([]);
+  const [categories, setCategories] = useState<CategoryItem[]>(() =>
+    getMemoryCache<CategoryItem[]>("categories.all") || []
+  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState(() => {
+    const cached = getMemoryCache<CategoryItem[]>("categories.all");
+    return cached && cached.length > 0 ? cached[0].id : "";
+  });
+  const [regions, setRegions] = useState<{ id: string; name: string }[]>(() =>
+    getMemoryCache<{ id: string; name: string }[]>("regions.all") || []
+  );
   const [selectedRegionId, setSelectedRegionId] = useState("");
   const [about, setAbout] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -118,22 +127,45 @@ export default function BusinessProfileScreen() {
     })();
   }, [provider, user]);
 
-  // Kategoriya va hududlarni yuklaymiz
+  // Kategoriya va hududlarni yuklaymiz (RAM va Disk kesh orqali tezkor)
   useEffect(() => {
     (async () => {
-      const { data: cats } = await supabase.from("categories").select("id, name");
-      const sorted = cats
-        ? [...cats].sort((a, b) => localize(a.name).localeCompare(localize(b.name)))
-        : [];
-      setCategories(sorted);
-      if (sorted.length > 0) setSelectedCategoryId((prev) => prev || sorted[0].id);
+      // 1. Agar RAM bo'sh bo'lsa, tezda disk keshini tekshiramiz
+      const diskCats = await readCache<CategoryItem[]>("categories.all");
+      if (diskCats && diskCats.length > 0) {
+        setCategories(diskCats);
+        setSelectedCategoryId((prev) => prev || diskCats[0].id);
+      }
+      const diskRegs = await readCache<{ id: string; name: string }[]>("regions.all");
+      if (diskRegs && diskRegs.length > 0) {
+        setRegions(diskRegs);
+      }
 
-      const { data: regs } = await supabase
-        .from("regions")
-        .select("id, name, slug")
-        .eq("is_active", true)
-        .order("name", { ascending: true });
-      setRegions(regs || []);
+      // 2. Supabase'dan fonda yangilaymiz
+      try {
+        const { data: cats } = await supabase
+          .from("categories")
+          .select("id, name, slug, image_url, booking_mode, uses_departments, uses_staff, sort_order")
+          .order("sort_order", { ascending: true });
+        const sorted = (cats as CategoryItem[]) || [];
+        if (sorted.length > 0) {
+          setCategories(sorted);
+          setSelectedCategoryId((prev) => prev || sorted[0].id);
+          await writeCache("categories.all", sorted, TTL_STATIC);
+        }
+
+        const { data: regs } = await supabase
+          .from("regions")
+          .select("id, name, slug")
+          .eq("is_active", true)
+          .order("name", { ascending: true });
+        if (regs && regs.length > 0) {
+          setRegions(regs);
+          await writeCache("regions.all", regs, TTL_STATIC);
+        }
+      } catch {
+        // Tarmoq xatosi bo'lsa kesh yetarli
+      }
     })();
   }, []);
 
@@ -345,6 +377,7 @@ export default function BusinessProfileScreen() {
       }
 
       showToast(t("svc.saved"));
+      invalidateCache("provider.").catch(() => {});
       await reload();
       router.back();
     } catch (e: any) {
@@ -379,6 +412,59 @@ export default function BusinessProfileScreen() {
           </Text>
         </View>
 
+        {/* Tarif holati — faqat biznes egasi uchun */}
+        {!readOnly && provider ? (
+          <Pressable onPress={() => router.push("/plan")}>
+            <GlassSurface style={styles.planBanner} fallbackStyle={styles.planBannerFallback} interactive>
+              <View style={[styles.planBannerIcon, { backgroundColor: alpha(colors.tertiaryContainer, 0.25) }]}>
+                <Crown size={18} color={colors.tertiary} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={styles.planBannerTitle}>{t("pv.more_plan")}</Text>
+                  <View
+                    style={{
+                      paddingHorizontal: 7,
+                      paddingVertical: 2,
+                      borderRadius: radius.sm,
+                      backgroundColor:
+                        provider?.subscription_status === "trial"
+                          ? alpha(colors.tertiaryContainer, 0.35)
+                          : alpha(colors.primaryContainer, 0.35),
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: "800",
+                        color:
+                          provider?.subscription_status === "trial"
+                            ? colors.tertiary
+                            : colors.primary,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {provider?.subscription_status === "trial"
+                        ? t("plan.badge_trial")
+                        : (provider?.plan_code || "pro").toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.planBannerSub} numberOfLines={1}>
+                  {provider?.subscription_status === "trial"
+                    ? provider?.trial_ends_at
+                      ? `${Math.max(0, Math.ceil((new Date(provider.trial_ends_at).getTime() - Date.now()) / (24 * 3600 * 1000)))} kun sinov muddati qoldi`
+                      : t("plan.status_trial")
+                    : provider?.plan_expires_at
+                    ? `${Math.max(0, Math.ceil((new Date(provider.plan_expires_at).getTime() - Date.now()) / (24 * 3600 * 1000)))} kun faol`
+                    : t("pv.more_plan_sub")}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={colors.onSurfaceVariant} />
+            </GlassSurface>
+          </Pressable>
+        ) : null}
+
         {/* Xodimga: sahifa qulflangan ekanini qisqa izohlaymiz */}
         {readOnly ? (
           <GlassSurface style={styles.noteBox} fallbackStyle={styles.noteBoxFallback}>
@@ -403,32 +489,29 @@ export default function BusinessProfileScreen() {
 
           <View>
             <Text style={styles.label}>{t("ab.slug")}</Text>
-            <TextInput
-              value={slug}
-              onChangeText={(v) => setSlug(v.toLowerCase().replace(/[^a-z0-9\-_]/g, ""))}
-              editable={!readOnly}
-              autoCapitalize="none"
-              placeholder="my-business"
-              placeholderTextColor={colors.outline}
-              style={[styles.input, readOnly && styles.inputReadonly]}
-            />
+            <View style={[styles.usernameRow, readOnly && styles.inputReadonly]}>
+              <View style={styles.atBadge}>
+                <Text style={styles.atText}>@</Text>
+              </View>
+              <TextInput
+                value={slug}
+                onChangeText={(v) => setSlug(v.toLowerCase().replace(/[^a-z0-9\-_]/g, ""))}
+                editable={!readOnly}
+                autoCapitalize="none"
+                placeholder={t("ab.slug_ph") || "barber_one"}
+                placeholderTextColor={colors.outline}
+                style={[styles.usernameInput, readOnly && styles.inputReadonly]}
+              />
+            </View>
             {readOnly ? null : <Text style={styles.hint}>{t("ab.slug_hint")}</Text>}
           </View>
 
-          {readOnly ? (
-            <ReadonlyField
-              label={t("ab.category")}
-              value={localize(categories.find((c) => c.id === selectedCategoryId)?.name)}
-            />
-          ) : (
-            <SelectField
-              label={t("ab.category")}
-              value={selectedCategoryId}
-              options={categories.map((c) => ({ value: c.id, label: localize(c.name) }))}
-              placeholder={t("ab.loading_categories")}
-              onChange={setSelectedCategoryId}
-            />
-          )}
+          <CategoryPicker
+            categories={categories}
+            selectedId={selectedCategoryId}
+            onChange={setSelectedCategoryId}
+            readOnly={readOnly}
+          />
 
           {readOnly ? (
             <ReadonlyField
@@ -482,12 +565,9 @@ export default function BusinessProfileScreen() {
           <Text style={styles.label}>{t("ab.location")}</Text>
           <LocationPicker
             coordinates={mapCoordinates}
-            onChange={setMapCoordinates}
+            onChange={(coords) => setMapCoordinates(coords)}
             readOnly={readOnly}
           />
-          <Text style={styles.hint}>
-            {mapCoordinates[0]}, {mapCoordinates[1]}
-          </Text>
         </GlassSurface>
 
         {/* Rasmlar */}
@@ -563,6 +643,29 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   headerRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   title: { fontSize: 20, fontWeight: "800", color: colors.onSurface, flex: 1 },
 
+  planBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 16,
+    borderRadius: radius.xl,
+    overflow: "hidden",
+  },
+  planBannerFallback: {
+    backgroundColor: colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+  },
+  planBannerIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  planBannerTitle: { fontSize: 14, fontWeight: "700", color: colors.onSurface },
+  planBannerSub: { fontSize: 12, color: colors.onSurfaceVariant, marginTop: 2 },
+
   card: {
     borderRadius: radius.xl,
     padding: 20,
@@ -589,6 +692,37 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     borderColor: colors.outlineVariant,
     borderRadius: radius.md,
     paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontWeight: "500",
+    color: colors.onSurface,
+  },
+  usernameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceContainerLowest,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    borderRadius: radius.md,
+    overflow: "hidden",
+  },
+  atBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: alpha(colors.primaryContainer, 0.25),
+    borderRightWidth: 1,
+    borderRightColor: colors.outlineVariant,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  atText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  usernameInput: {
+    flex: 1,
+    paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 14,
     fontWeight: "500",
