@@ -44,6 +44,7 @@ import {
   View,
 } from "react-native";
 import { GlassSurface } from "@/components/pv/ui";
+import { getCategoryImage } from "@/constants/category-images";
 import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
@@ -250,6 +251,9 @@ export function CategoryPicker({
 
   const selectedMeta = selectedCategory ? getCategoryMeta(selectedCategory.slug) : null;
   const SelectedIcon = selectedMeta?.icon;
+  const selectedImage = selectedCategory
+    ? getCategoryImage(selectedCategory.slug, selectedCategory.image_url)
+    : null;
 
   return (
     <View>
@@ -267,9 +271,9 @@ export function CategoryPicker({
         >
           {selectedCategory ? (
             <View style={styles.selectedContent}>
-              {selectedCategory.image_url ? (
+              {selectedImage ? (
                 <Image
-                  source={{ uri: selectedCategory.image_url }}
+                  source={selectedImage}
                   style={styles.selectedImg}
                   contentFit="cover"
                 />
@@ -450,6 +454,7 @@ export function CategoryPicker({
                 const meta = getCategoryMeta(item.slug);
                 const Icon = meta.icon;
                 const isSelected = item.id === selectedId;
+                const image = getCategoryImage(item.slug, item.image_url);
                 const groupBadgeText = getGroupBadgeText(item.slug);
                 const groupBadgeColor = getGroupBadgeColor(item.slug);
 
@@ -468,9 +473,9 @@ export function CategoryPicker({
                       pressed && { opacity: 0.8 },
                     ]}
                   >
-                    {item.image_url ? (
+                    {image ? (
                       <Image
-                        source={{ uri: item.image_url }}
+                        source={image}
                         style={styles.itemImg}
                         contentFit="cover"
                       />
