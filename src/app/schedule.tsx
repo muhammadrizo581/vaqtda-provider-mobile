@@ -3,7 +3,6 @@
 import { useRouter } from "expo-router";
 import {
   AlertCircle,
-  Armchair,
   ArrowLeft,
   CalendarDays,
   CalendarPlus,
@@ -11,14 +10,12 @@ import {
   ChevronDown,
   Clock,
   Coffee,
+  HelpCircle,
   Layers,
   Lock,
-  Monitor,
   Plus,
   Save,
   Stethoscope,
-  Tag,
-  Timer,
   Trash2,
   Users,
 } from "lucide-react-native";
@@ -76,16 +73,13 @@ interface DaySchedule {
 }
 type ScheduleMap = Record<string, DaySchedule>; // kalit — "YYYY-MM-DD" (aniq sana)
 
-// slots rejimida davomiylik xizmatlardan olinadi; table rejimida esa
-// slotMinutes — har bir stol/kompyuter broni qancha vaqtga band qilinishini belgilaydi.
+// table rejimida slotMinutes — har bir stol/kompyuter broni qancha vaqtga band qilinishini belgilaydi.
 interface TimetableConfig {
-  bufferMinutes: number;
   slotMinutes: number;
 }
 
-const DEFAULT_CONFIG: TimetableConfig = { bufferMinutes: 0, slotMinutes: 60 };
+const DEFAULT_CONFIG: TimetableConfig = { slotMinutes: 60 };
 
-const BUFFER_OPTIONS = [0, 5, 10, 15, 30];
 const SLOT_DURATION_OPTIONS = [30, 45, 60, 90, 120, 180];
 const MAX_WEEKS = 8;
 const WD_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -120,7 +114,7 @@ function ScheduleContent() {
   const { t } = useLanguage();
   const { provider, reload: reloadProvider } = useProvider();
   const { showToast } = useToast();
-  const { mode, unit, usesStaff, loading: modeLoading } = useBookingMode();
+  const { mode, unit, usesStaff, usesDepartments, loading: modeLoading } = useBookingMode();
   // daily (dacha/villa): kun faqat ochiq/yopiq — vaqt oralig'i tahrirlanmaydi, xizmat ixtiyoriy
   const daily = mode === "daily";
   // table (restoran, kompyuter klub): xizmat yo'q — kamida bitta faol stol/kompyuter kerak
@@ -249,7 +243,6 @@ function ScheduleContent() {
         .maybeSingle();
       if (cfg) {
         setConfig({
-          bufferMinutes: cfg.buffer_minutes || 0,
           slotMinutes: cfg.slot_duration_minutes || 60,
         });
         savedScheduleDays.current = Number(cfg.schedule_days) || 0;
@@ -479,7 +472,6 @@ function ScheduleContent() {
       // schedule_days kamaymaydi (boshqa shifokorlarning uzoqroq jadvali bor)
       const days = Math.max(1, maxOffset + 1);
       const configPayload: Record<string, unknown> = {
-        buffer_minutes: config.bufferMinutes,
         slot_duration_minutes: Math.max(15, config.slotMinutes),
         schedule_days: staffScoped ? Math.max(days, savedScheduleDays.current) : days,
         updated_at: new Date().toISOString(),
@@ -535,8 +527,11 @@ function ScheduleContent() {
         delSlots = staffId ? delSlots.eq("staff_id", staffId) : delSlots.is("staff_id", null);
         delBreaks = staffId ? delBreaks.eq("staff_id", staffId) : delBreaks.is("staff_id", null);
       }
-      await delSlots;
-      await delBreaks;
+      const [{ error: deleteSlotsError }, { error: deleteBreaksError }] = await Promise.all([
+        delSlots,
+        delBreaks,
+      ]);
+      if (deleteSlotsError || deleteBreaksError) throw deleteSlotsError || deleteBreaksError;
 
       if (slotsToInsert.length > 0) {
         const { error: slotErr } = await supabase.from("timetable_slots").insert(slotsToInsert);
@@ -628,51 +623,39 @@ function ScheduleContent() {
     return result;
   };
 
-  // Jonli holat: bugun hozir ochiqmi
-  const liveStatus = useMemo(() => {
-    const today = schedule[tashNow.dateStr];
-    if (!today?.enabled || today.slots.length === 0) {
-      return { open: false, label: t("tt.live_closed_today") };
-    }
-    const nowMin = timeToMin(tashNow.hhmm);
-    const inBreak = today.breaks.some(
-      (b) => nowMin >= timeToMin(b.start) && nowMin < timeToMin(b.end)
-    );
-    if (inBreak) return { open: false, label: t("tt.live_break") };
-    const inSlot = today.slots.some(
-      (s) => nowMin >= timeToMin(s.start) && nowMin < timeToMin(s.end)
-    );
-    if (inSlot) return { open: true, label: t("tt.live_open") };
-    const next = today.slots
-      .map((s) => timeToMin(s.start))
-      .filter((m) => m > nowMin)
-      .sort((a, b) => a - b)[0];
-    if (next !== undefined) {
-      const h = String(Math.floor(next / 60)).padStart(2, "0");
-      const m = String(next % 60).padStart(2, "0");
-      return { open: false, label: t("tt.live_opens_at", { time: `${h}:${m}` }) };
-    }
-    return { open: false, label: t("tt.live_closed") };
-  }, [schedule, tashNow.dateStr, tashNow.hhmm, t]);
-
-  const activeDays = visibleDates.filter((d) => schedule[d]?.enabled).length;
-  const totalSlots = visibleDates.reduce(
-    (sum, d) => sum + (schedule[d]?.enabled ? schedule[d].slots.length : 0),
-    0
-  );
+  // Korporativ biznes: shifoxona / klinika (bo'limlari va xodimlari bor).
+  // Individual bizneslarga (sartaroshxona, yakka usta, dacha va h.k.) bu rejim ko'rinmaydi.
+  const isCorporate = usesDepartments && usesStaff && !isStaff;
+  const [showModeHelp, setShowModeHelp] = useState(false);
 
   // ── Render ─────────────────────────────────────────────────────────────────
-  // Jadval rejimi — faqat klinika rahbari uchun. Butun biznesga bitta jadvalmi
-  // yoki har bir shifokor o'ziniki — shu yerda tanlanadi. "Shifokor yo'q"
-  // holatida ham ko'rsatiladi, aks holda rahbar rejimni qaytara olmay qolardi.
-  const modeSwitch = clinicOwner ? (
+  // Jadval rejimi — faqat korporativ klinika/shifoxona rahbari uchun.
+  const modeSwitch = isCorporate ? (
     <Card style={styles.modeCard}>
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-        <Users size={16} color={colors.primary} />
-        <Text style={styles.cardTitle}>{t("sch.mode_title")}</Text>
+      <View style={styles.modeHeaderRow}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <Users size={16} color={colors.primary} />
+          <Text style={styles.cardTitle}>{t("sch.mode_title")}</Text>
+        </View>
+        <Pressable
+          onPress={() => setShowModeHelp((prev) => !prev)}
+          style={styles.helpBtn}
+          hitSlop={10}
+        >
+          <HelpCircle size={18} color={showModeHelp ? colors.primary : colors.onSurfaceVariant} />
+        </Pressable>
       </View>
-      <Text style={styles.cardDesc}>{t("sch.mode_desc")}</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+
+      {showModeHelp && (
+        <View style={styles.helpBox}>
+          <Text style={styles.cardDesc}>{t("sch.mode_desc")}</Text>
+          <Text style={styles.modeHint}>
+            {sharedSchedule ? t("sch.mode_shared_hint") : t("sch.mode_individual_hint")}
+          </Text>
+        </View>
+      )}
+
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
         <SelectPill
           label={t("sch.mode_shared")}
           active={sharedSchedule}
@@ -686,9 +669,6 @@ function ScheduleContent() {
           style={{ flexGrow: 1 }}
         />
       </View>
-      <Text style={styles.modeHint}>
-        {sharedSchedule ? t("sch.mode_shared_hint") : t("sch.mode_individual_hint")}
-      </Text>
     </Card>
   ) : null;
 
@@ -711,8 +691,6 @@ function ScheduleContent() {
             desc={t("stf.need_staff_desc")}
           />
           <View style={{ alignItems: "center" }}>
-            {/* replace — shifokor qo'shilgach jadval ekrani yangidan ochiladi
-                (aks holda eski "bo'sh" holat stack'da qolib ketardi) */}
             <SmallButton
               label={t("stf.add")}
               icon={Plus}
@@ -732,68 +710,18 @@ function ScheduleContent() {
     );
   }
 
-  const statTiles = [
-    { icon: CalendarDays, value: String(activeDays), label: t("tt.stat_days"), color: colors.primary, bg: alpha(colors.primaryContainer, 0.2) },
-    { icon: Clock, value: String(totalSlots), label: t("tt.stat_slots"), color: colors.secondary, bg: alpha(colors.secondaryContainer, 0.2) },
-    tableMode
-      ? { icon: pcUnit ? Monitor : Armchair, value: String(activeTables), label: t(pcUnit ? "tt.stat_computers" : "tt.stat_tables"), color: colors.primary, bg: alpha(colors.primaryContainer, 0.2) }
-      : { icon: Tag, value: String(activeServices), label: t("tt.stat_services"), color: colors.primary, bg: alpha(colors.primaryContainer, 0.2) },
-    { icon: Timer, value: config.bufferMinutes > 0 ? `${config.bufferMinutes}m` : "—", label: t("tt.stat_buffer"), color: colors.tertiary, bg: alpha(colors.tertiaryContainer, 0.2) },
-  ];
-
   return (
     <Screen>
-      {/* Header */}
-      <View>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <GlassIconButton onPress={() => router.back()}>
-            <ArrowLeft size={18} color={colors.onSurfaceVariant} />
-          </GlassIconButton>
-          <CalendarDays size={24} color={colors.primary} />
-          <Text style={styles.title}>{t("pv.schedule_title")}</Text>
-        </View>
-        <Text style={styles.subtitle}>{t("tt.subtitle")}</Text>
-
-        {/* Jonli Toshkent vaqti + holat */}
-        <View style={styles.liveRow}>
-          <GlassSurface style={styles.clockChip} fallbackStyle={styles.chipFallback}>
-            <View style={styles.liveDot} />
-            <Clock size={13} color={colors.primary} />
-            <Text style={styles.clockText}>
-              {UZ_WEEKDAYS[tashNow.weekdayKey]}, {formatUzDate(tashNow.dateStr)} · {tashNow.hhmm}
-            </Text>
-            <Text style={styles.clockSub}>{t("tt.tashkent_time")}</Text>
-          </GlassSurface>
-          <GlassSurface
-            style={styles.statusChip}
-            fallbackStyle={[
-              styles.chipFallback,
-              liveStatus.open && {
-                backgroundColor: alpha(colors.primaryContainer, 0.2),
-                borderColor: alpha(colors.primaryContainer, 0.4),
-              },
-            ]}
-            tintColor={liveStatus.open ? alpha(colors.primaryContainer, 0.35) : undefined}
-          >
-            <View
-              style={[
-                styles.liveDot,
-                { backgroundColor: liveStatus.open ? colors.primary : colors.outline },
-              ]}
-            />
-            <Text
-              style={[
-                styles.statusText,
-                { color: liveStatus.open ? colors.primary : colors.onSurfaceVariant },
-              ]}
-            >
-              {liveStatus.label}
-            </Text>
-          </GlassSurface>
-        </View>
+      {/* Header — faqat orqaga tugmasi, ikonka va sarlavha */}
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+        <GlassIconButton onPress={() => router.back()}>
+          <ArrowLeft size={18} color={colors.onSurfaceVariant} />
+        </GlassIconButton>
+        <CalendarDays size={24} color={colors.primary} />
+        <Text style={styles.title}>{t("pv.schedule_title")}</Text>
       </View>
 
-      {/* Jadval rejimi (klinika rahbari) */}
+      {/* Jadval rejimi (faqat korporativ klinika/shifoxona rahbari uchun) */}
       {modeSwitch}
 
       {/* Shifokor tanlash — faqat "har kimga alohida" rejimida: jadval har bir
@@ -889,31 +817,8 @@ function ScheduleContent() {
         </GlassSurface>
       ) : null}
 
-      {/* Stats */}
-      <View style={styles.statTiles}>
-        {statTiles.map((s) => (
-          <GlassSurface key={s.label} style={styles.statTile} fallbackStyle={styles.statTileFallback}>
-            <View style={[styles.statTileIcon, { backgroundColor: s.bg }]}>
-              <s.icon size={18} color={s.color} />
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.statTileValue}>{s.value}</Text>
-              <Text style={styles.statTileLabel} numberOfLines={1}>
-                {s.label}
-              </Text>
-            </View>
-          </GlassSurface>
-        ))}
-      </View>
-
-      {/* Sanalar jadvali */}
+      {/* Kunlar jadvali */}
       <Card>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardTitle}>{t("tt.tab_schedule")}</Text>
-          <Text style={styles.cardDesc}>
-            {readOnly ? t("sch.card_desc_readonly") : t("tt.card_desc")}
-          </Text>
-        </View>
 
         {weekGroups.map((group) => (
           <View key={group.label}>
@@ -1217,7 +1122,7 @@ function ScheduleContent() {
       {tableMode && !isStaff && !readOnly && (
         <Card style={{ padding: 20 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Timer size={16} color={colors.primary} />
+            <Clock size={16} color={colors.primary} />
             <Text style={styles.cardTitle}>{t("tt.slotdur_title")}</Text>
           </View>
           <Text style={[styles.cardDesc, { marginTop: 2, marginBottom: 16 }]}>
@@ -1246,30 +1151,7 @@ function ScheduleContent() {
         </Card>
       )}
 
-      {/* Oraliq vaqt (buffer) — biznes sozlamasi, xodimga ko'rsatilmaydi.
-          Faqat ko'rish holatida ham yashiriladi (saqlash tugmasi yo'q). */}
-      {!isStaff && !readOnly && (
-        <Card style={{ padding: 20 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Layers size={16} color={colors.primary} />
-            <Text style={styles.cardTitle}>{t("tt.buffer_title")}</Text>
-          </View>
-          <Text style={[styles.cardDesc, { marginTop: 2, marginBottom: 16 }]}>
-            {t("tt.buffer_desc")}
-          </Text>
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-            {BUFFER_OPTIONS.map((v) => (
-              <SelectPill
-                key={v}
-                label={v === 0 ? t("tt.buffer_none") : `${v} ${t("common.min")}`}
-                active={config.bufferMinutes === v}
-                onPress={() => setConfig((c) => ({ ...c, bufferMinutes: v }))}
-                style={{ flexGrow: 1 }}
-              />
-            ))}
-          </View>
-        </Card>
-      )}
+
     </Screen>
   );
 }
@@ -1284,23 +1166,7 @@ export default function ScheduleScreen() {
 
 const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   title: { fontSize: 22, fontWeight: "700", color: colors.onSurface, letterSpacing: -0.5 },
-  subtitle: { fontSize: 14, color: colors.onSurfaceVariant, marginTop: 4 },
 
-  liveRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 },
-  clockChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    overflow: "hidden",
-  },
-  chipFallback: {
-    backgroundColor: colors.surfaceContainer,
-    borderWidth: 1,
-    borderColor: colors.outlineVariant,
-  },
   staffPickerLabel: {
     fontSize: 11,
     fontWeight: "700",
@@ -1316,19 +1182,11 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     overflow: "hidden",
   },
   staffChipText: { fontSize: 13, fontWeight: "700" },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.primary },
-  clockText: { fontSize: 11, fontWeight: "700", color: colors.onSurface },
-  clockSub: { fontSize: 10, fontWeight: "600", color: colors.onSurfaceVariant },
-  statusChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    overflow: "hidden",
+  chipFallback: {
+    backgroundColor: colors.surfaceContainer,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
-  statusText: { fontSize: 11, fontWeight: "700" },
 
   errorBox: {
     flexDirection: "row",
@@ -1347,7 +1205,25 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
   errorText: { flex: 1, color: colors.error, fontSize: 13, fontWeight: "600" },
 
   // ── Jadval rejimi va "faqat ko'rish" izohi ──
-  modeCard: { padding: 20, gap: 12 },
+  modeCard: { padding: 18, gap: 8 },
+  modeHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  helpBtn: {
+    padding: 6,
+    borderRadius: radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  helpBox: {
+    backgroundColor: alpha(colors.surfaceContainerHighest, 0.4),
+    borderRadius: radius.md,
+    padding: 10,
+    gap: 6,
+    marginTop: 4,
+  },
   modeHint: { fontSize: 12, color: colors.onSurfaceVariant, lineHeight: 17 },
   noteBox: {
     flexDirection: "row",

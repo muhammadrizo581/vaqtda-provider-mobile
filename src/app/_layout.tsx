@@ -20,7 +20,7 @@ import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 SplashScreen.preventAutoHideAsync();
 
 function RootNavigator() {
-  const { isAuthenticated, user, loading } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const { colors } = useTheme();
   const [introDone, setIntroDone] = useState(false);
 
@@ -31,11 +31,8 @@ function RootNavigator() {
 
   // Panelga KIRISH huquqi AuthContext'da tekshiriladi (provayder roli, biznes
   // egaligi YOKI provider_staff a'zoligi) — ruxsati yo'q sessiya u yerda yopiladi.
-  // Bu yerda faqat QAYSI panel ochilishi hal qilinadi:
-  //   role === "worker"  → (worker) — usta/shifokorning o'z paneli
-  //   qolgani (provider/admin) → (tabs) — biznes egasining paneli
-  const isWorker = isAuthenticated && user?.role === "worker";
-  const isProvider = isAuthenticated && !isWorker;
+  // Ega ham, usta/shifokor ham to'liq va boy (tabs) paneli bilan ishlaydi.
+  const isAuthed = isAuthenticated;
   const showOverlay = loading || !introDone;
 
   return (
@@ -48,7 +45,7 @@ function RootNavigator() {
             contentStyle: { backgroundColor: colors.background },
           }}
         >
-          <Stack.Protected guard={isProvider}>
+          <Stack.Protected guard={isAuthed}>
             <Stack.Screen name="(tabs)" />
             <Stack.Screen name="stats" />
             <Stack.Screen name="settings" />
@@ -67,10 +64,7 @@ function RootNavigator() {
             <Stack.Screen name="payment-settings" />
             <Stack.Screen name="chat/[id]" />
           </Stack.Protected>
-          <Stack.Protected guard={isWorker}>
-            <Stack.Screen name="(worker)" />
-          </Stack.Protected>
-          <Stack.Protected guard={!isProvider && !isWorker}>
+          <Stack.Protected guard={!isAuthed}>
             <Stack.Screen name="login" />
           </Stack.Protected>
         </Stack>

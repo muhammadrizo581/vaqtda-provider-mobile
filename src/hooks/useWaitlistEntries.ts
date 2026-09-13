@@ -1,6 +1,6 @@
-// Provayderning navbat (waitlist) yozuvlari — to'g'ridan-to'g'ri Supabase'dan.
 import { useCallback, useEffect, useState } from "react";
 import { useProvider } from "@/context/ProviderContext";
+import { getMemoryCache, readCache, writeCache, TTL_DYNAMIC } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 
 export interface WaitlistClient {
@@ -28,8 +28,13 @@ export interface WaitlistEntry {
 export function useWaitlistEntries() {
   const { provider } = useProvider();
   const providerId = provider?.id;
-  const [entries, setEntries] = useState<WaitlistEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = providerId ? `waitlist.${providerId}` : "";
+
+  // 1. RAM xotiradan sinxron o'qish (0ms instant)
+  const initialCache = cacheKey ? getMemoryCache<WaitlistEntry[]>(cacheKey) : null;
+
+  const [entries, setEntries] = useState<WaitlistEntry[]>(initialCache ?? []);
+  const [loading, setLoading] = useState<boolean>(!initialCache);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -37,7 +42,14 @@ export function useWaitlistEntries() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+
+    // Disk keshni tezkor tekshirish
+    const cached = await readCache<WaitlistEntry[]>(cacheKey);
+    if (cached && cached.length > 0) {
+      setEntries(cached);
+      setLoading(false);
+    }
+
     setError(null);
     try {
       const { data, error: err } = await supabase
@@ -59,24 +71,49 @@ export function useWaitlistEntries() {
         profiles = Object.fromEntries((profs || []).map((p: any) => [p.id, p]));
       }
 
-      setEntries(
-        (data || []).map((e: any) => ({
-          ...e,
-          client: profiles[e.client_id] || null,
-        }))
-      );
+      const fresh: WaitlistEntry[] = (data || []).map((e: any) => ({
+        ...e,
+        client: profiles[e.client_id] || null,
+      }));
+
+      setEntries(fresh);
+      await writeCache(cacheKey, fresh, TTL_DYNAMIC);
     } catch {
-      setError("load_failed");
+      if (!cached) setError("load_failed");
     } finally {
       setLoading(false);
     }
-  }, [providerId]);
+  }, [providerId, cacheKey]);
 
-  // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
+  const notify = useCallback(
+    async (id: string) => {
+      const now = new Date().toISOString();
+      const { error: err } = await supabase
+        .from("waitlist")
+        .update({
+          status: "notified",
+          notified_at: now,
+        })
+        .eq("id", id);
+      if (!err) {
+        setEntries((prev) => {
+          const updated = prev.map((e) =>
+            e.id === id ? { ...e, status: "notified", notified_at: now } : e
+          );
+          if (providerId) writeCache(`waitlist.${providerId}`, updated, TTL_DYNAMIC).catch(() => {});
+          return updated;
+        });
+        return true;
+      }
+      return false;
+    },
+    [providerId]
+  );
+
   useEffect(() => {
     const t = setTimeout(load, 0);
     return () => clearTimeout(t);
   }, [load]);
 
-  return { entries, loading, error, reload: load };
+  return { entries, loading, error, reload: load, notify };
 }

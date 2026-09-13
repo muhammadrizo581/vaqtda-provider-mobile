@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useProvider } from "@/context/ProviderContext";
 import { useStaffRoleContext } from "@/context/StaffRoleContext";
+import { getMemoryCache, readCache, writeCache, TTL_DYNAMIC } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 
 export interface QueueClient {
@@ -23,16 +24,27 @@ export interface QueueEntry {
   client: QueueClient | null;
 }
 
+interface DeptQueueCache {
+  departmentId: string | null;
+  departmentName: string | null;
+  isAvailable: boolean;
+  entries: QueueEntry[];
+}
+
 export function useDepartmentQueue() {
   const { provider } = useProvider();
   const { staffId } = useStaffRoleContext();
   const providerId = provider?.id;
+  const cacheKey = providerId && staffId ? `dept_queue.${providerId}.${staffId}` : "";
 
-  const [departmentId, setDepartmentId] = useState<string | null>(null);
-  const [departmentName, setDepartmentName] = useState<string | null>(null);
-  const [isAvailable, setIsAvailable] = useState(false);
-  const [entries, setEntries] = useState<QueueEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 1. RAM xotiradan sinxron o'qish (0ms instant)
+  const initialCache = cacheKey ? getMemoryCache<DeptQueueCache>(cacheKey) : null;
+
+  const [departmentId, setDepartmentId] = useState<string | null>(initialCache?.departmentId ?? null);
+  const [departmentName, setDepartmentName] = useState<string | null>(initialCache?.departmentName ?? null);
+  const [isAvailable, setIsAvailable] = useState<boolean>(initialCache?.isAvailable ?? false);
+  const [entries, setEntries] = useState<QueueEntry[]>(initialCache?.entries ?? []);
+  const [loading, setLoading] = useState<boolean>(!initialCache);
   const [toggling, setToggling] = useState(false);
 
   const load = useCallback(async () => {
@@ -40,7 +52,17 @@ export function useDepartmentQueue() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+
+    // Disk keshni tekshirish
+    const cached = await readCache<DeptQueueCache>(cacheKey);
+    if (cached) {
+      setDepartmentId(cached.departmentId);
+      setDepartmentName(cached.departmentName);
+      setIsAvailable(cached.isAvailable);
+      setEntries(cached.entries);
+      setLoading(false);
+    }
+
     try {
       const { data: staff } = await supabase
         .from("provider_staff")
@@ -49,13 +71,23 @@ export function useDepartmentQueue() {
         .maybeSingle();
 
       const deptId = (staff as any)?.department_id ?? null;
-      setDepartmentId(deptId);
-      setIsAvailable(!!(staff as any)?.is_available);
+      const deptAvailable = !!(staff as any)?.is_available;
       const deptRaw = (staff as any)?.provider_departments?.name;
-      setDepartmentName(deptRaw?.uz || deptRaw?.ru || null);
+      const deptNameStr = deptRaw?.uz || deptRaw?.ru || null;
+
+      setDepartmentId(deptId);
+      setIsAvailable(deptAvailable);
+      setDepartmentName(deptNameStr);
 
       if (!deptId) {
         setEntries([]);
+        if (cacheKey) {
+          writeCache(
+            cacheKey,
+            { departmentId: null, departmentName: null, isAvailable: deptAvailable, entries: [] },
+            TTL_DYNAMIC
+          ).catch(() => {});
+        }
         setLoading(false);
         return;
       }
@@ -79,11 +111,28 @@ export function useDepartmentQueue() {
         profiles = Object.fromEntries((profs || []).map((p: any) => [p.id, p]));
       }
 
-      setEntries((data || []).map((e: any) => ({ ...e, client: profiles[e.client_id] || null })));
+      const freshEntries: QueueEntry[] = (data || []).map((e: any) => ({
+        ...e,
+        client: profiles[e.client_id] || null,
+      }));
+      setEntries(freshEntries);
+
+      if (cacheKey) {
+        await writeCache(
+          cacheKey,
+          {
+            departmentId: deptId,
+            departmentName: deptNameStr,
+            isAvailable: deptAvailable,
+            entries: freshEntries,
+          },
+          TTL_DYNAMIC
+        );
+      }
     } finally {
       setLoading(false);
     }
-  }, [providerId, staffId]);
+  }, [providerId, staffId, cacheKey]);
 
   useEffect(() => {
     const t = setTimeout(load, 0);
@@ -106,10 +155,19 @@ export function useDepartmentQueue() {
 
   const setEntryStatus = useCallback(
     async (id: string, status: "converted" | "cancelled") => {
-      setEntries((prev) => prev.filter((e) => e.id !== id));
+      setEntries((prev) => {
+        const next = prev.filter((e) => e.id !== id);
+        if (cacheKey) {
+          const current = getMemoryCache<DeptQueueCache>(cacheKey);
+          if (current) {
+            writeCache(cacheKey, { ...current, entries: next }, TTL_DYNAMIC).catch(() => {});
+          }
+        }
+        return next;
+      });
       await supabase.from("department_waitlist").update({ status }).eq("id", id);
     },
-    []
+    [cacheKey]
   );
 
   return {

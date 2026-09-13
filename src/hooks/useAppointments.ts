@@ -2,6 +2,7 @@
 // /api/provider/appointments logikasi bilan bir xil, lekin RLS ostida).
 import { useCallback, useEffect, useState } from "react";
 import { useProvider } from "@/context/ProviderContext";
+import { getMemoryCache, invalidateCache, readCache, writeCache, TTL_DYNAMIC } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 
 export interface AppointmentClient {
@@ -40,8 +41,13 @@ export interface Appointment {
 export function useAppointments() {
   const { provider } = useProvider();
   const providerId = provider?.id;
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = providerId ? `appointments.${providerId}` : "";
+
+  // RAM xotiradan sinxron o'qish (tab o'tganda 0ms instant ochiladi)
+  const [appointments, setAppointments] = useState<Appointment[]>(() =>
+    cacheKey ? getMemoryCache<Appointment[]>(cacheKey) || [] : []
+  );
+  const [loading, setLoading] = useState<boolean>(() => appointments.length === 0);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -51,6 +57,13 @@ export function useAppointments() {
     }
     setLoading(true);
     setError(null);
+    const cacheKey = `appointments.${providerId}`;
+    // Agar RAM bo'sh bo'lgan bo'lsa, tezda diskdagi keshni ko'rsatib turamiz
+    const cached = await readCache<Appointment[]>(cacheKey);
+    if (cached && cached.length > 0) {
+      setAppointments(cached);
+      setLoading(false);
+    }
     try {
       const BASE_COLS =
         "id, client_id, booking_date, start_time, end_time, duration_minutes, status, notes, price, service_id, created_at";
@@ -133,8 +146,7 @@ export function useAppointments() {
         });
       }
 
-      setAppointments(
-        (bookings || []).map((b: any) => ({
+      const nextAppointments = (bookings || []).map((b: any) => ({
           ...b,
           services: Array.isArray(b.services) ? b.services[0] || null : b.services,
           client: profiles[b.client_id] || null,
@@ -142,10 +154,19 @@ export function useAppointments() {
           staff_id: b.staff_id ?? null,
           staff_name: b.staff_id ? staffNames[b.staff_id] || null : null,
           paid_amount: paidByBooking[b.id] || 0,
-        }))
-      );
+        }));
+      setAppointments(nextAppointments);
+      await writeCache(cacheKey, nextAppointments, TTL_DYNAMIC);
     } catch {
-      setError("load_failed");
+      if (!cached) {
+        const diskFallback = await readCache<Appointment[]>(cacheKey);
+        if (diskFallback) {
+          setAppointments(diskFallback);
+          setError(null);
+        } else {
+          setError("load_failed");
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -179,10 +200,15 @@ export function useAppointments() {
         const { error: rpcErr } = await supabase.rpc("emit_review_request", { p_booking_id: id });
         if (rpcErr) console.warn("emit_review_request:", rpcErr.message);
       }
-      setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status } : a)));
+      setAppointments((prev) => {
+        const updated = prev.map((a) => (a.id === id ? { ...a, status } : a));
+        if (provider?.id) writeCache(`appointments.${provider.id}`, updated, TTL_DYNAMIC).catch(() => {});
+        return updated;
+      });
+      invalidateCache("stats.").catch(() => {});
       return true;
     },
-    [provider?.id]
+    [provider]
   );
 
   // Qolgan summani NAQD qabul qilib bandlikni yopish: payments'ga cash/paid
@@ -206,17 +232,26 @@ export function useAppointments() {
         });
         if (payErr) return false;
         // Bron to'liq to'landi deb belgilaymiz (mijoz ilovasi uchun izchillik)
-        await supabase.from("bookings").update({ payment_status: "paid" }).eq("id", id);
+        const { error: bookingPaymentError } = await supabase
+          .from("bookings")
+          .update({ payment_status: "paid" })
+          .eq("id", id)
+          .eq("provider_id", providerId);
+        if (bookingPaymentError) return false;
       }
       const ok = await act(id, "complete");
       if (ok) {
-        setAppointments((prev) =>
-          prev.map((a) => (a.id === id ? { ...a, paid_amount: a.paid_amount + amount } : a))
-        );
+        setAppointments((prev) => {
+          const updated = prev.map((a) => (a.id === id ? { ...a, paid_amount: a.paid_amount + amount } : a));
+          writeCache(`appointments.${providerId}`, updated, TTL_DYNAMIC).catch(() => {});
+          return updated;
+        });
+        invalidateCache("wallet.").catch(() => {});
+        invalidateCache("stats.").catch(() => {});
       }
       return ok;
     },
-    [provider?.id, act]
+    [provider, act]
   );
 
   return { appointments, loading, error, reload: load, act, settleCashAndComplete };

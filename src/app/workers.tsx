@@ -57,6 +57,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors, useTheme } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
 import { useBookingMode } from "@/hooks/useBookingMode";
+import { getMemoryCache, invalidateCache, readCache, writeCache, TTL_SERVICES } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
 
@@ -185,9 +186,13 @@ function WorkersContent() {
   const { showToast } = useToast();
   const router = useRouter();
   const providerId = provider?.id || null;
+  const staffCacheKey = providerId ? `staff.${providerId}` : "";
 
-  const [staff, setStaff] = useState<Staff[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 1. RAM xotiradan sinxron o'qish (0ms instant)
+  const initialStaff = staffCacheKey ? getMemoryCache<Staff[]>(staffCacheKey) : null;
+
+  const [staff, setStaff] = useState<Staff[]>(initialStaff ?? []);
+  const [loading, setLoading] = useState<boolean>(!initialStaff);
 
   // Qo'shish formasi
   const [formOpen, setFormOpen] = useState(false);
@@ -210,21 +215,19 @@ function WorkersContent() {
   const [resetFor, setResetFor] = useState<string | null>(null); // parolni yangilash tasdig'i
 
   // Owner tugmasi: ustalar o'z narxini belgilaydimi (providers.staff_sets_own_price)
-  const [selfPricing, setSelfPricing] = useState(false);
-  useEffect(() => {
-    setSelfPricing(provider?.staff_sets_own_price === true);
-  }, [provider?.staff_sets_own_price]);
+  const [selfPricingOverride, setSelfPricingOverride] = useState<boolean | null>(null);
+  const selfPricing = selfPricingOverride ?? provider?.staff_sets_own_price === true;
 
   const toggleSelfPricing = async () => {
     if (!providerId) return;
     const next = !selfPricing;
-    setSelfPricing(next); // optimistik
+    setSelfPricingOverride(next); // optimistik
     const { error } = await supabase
       .from("providers")
       .update({ staff_sets_own_price: next })
       .eq("id", providerId);
     if (error) {
-      setSelfPricing(!next);
+      setSelfPricingOverride(null);
       showToast(t("wk.save_failed"), "error");
     } else {
       await reloadProvider();
@@ -252,17 +255,28 @@ function WorkersContent() {
 
   const load = useCallback(async () => {
     if (!providerId) return;
-    setLoading(true);
+
+    // Disk keshni tekshirish
+    if (staffCacheKey) {
+      const cached = await readCache<Staff[]>(staffCacheKey);
+      if (cached && cached.length > 0) {
+        setStaff(cached);
+        setLoading(false);
+      }
+    }
+
     const { data } = await supabase
       .from("provider_staff")
       .select("*")
       .eq("provider_id", providerId)
       .order("sort_order", { ascending: true })
       .order("created_at", { ascending: true });
-    setStaff((data as Staff[]) || []);
+    const freshStaff = (data as Staff[]) || [];
+    setStaff(freshStaff);
+    if (staffCacheKey) writeCache(staffCacheKey, freshStaff, TTL_SERVICES).catch(() => {});
     await loadCreds();
     setLoading(false);
-  }, [providerId, loadCreds]);
+  }, [providerId, loadCreds, staffCacheKey]);
 
   // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
   useEffect(() => {
@@ -335,6 +349,7 @@ function WorkersContent() {
       // ham login+parol ochiq ko'rinadi (worker_credentials'dan)
       setCredentials({ username: uname, password });
       resetForm();
+      if (providerId) invalidateCache(`staff.${providerId}`).catch(() => {});
       await load();
     } catch {
       showToast(t("wk.create_failed"), "error");
@@ -433,7 +448,12 @@ function WorkersContent() {
       showToast(t("wk.save_failed"), "error");
       return;
     }
-    setStaff((prev) => prev.filter((w) => w.id !== id));
+    setStaff((prev) => {
+      const next = prev.filter((w) => w.id !== id);
+      if (staffCacheKey) writeCache(staffCacheKey, next, TTL_SERVICES).catch(() => {});
+      return next;
+    });
+    if (providerId) invalidateCache(`staff.${providerId}`).catch(() => {});
     showToast(t("wk.deleted"));
   };
 

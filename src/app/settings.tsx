@@ -1,6 +1,6 @@
 // Sozlamalar — web'dagi sidebar funksiyalari: til, biznes profil, chiqish.
 import { useRouter } from "expo-router";
-import { ArrowLeft, ChevronRight, Globe, LogOut, Moon, MonitorSmartphone, QrCode, Share2, Store, Sun } from "lucide-react-native";
+import { ArrowLeft, Building2, ChevronRight, Crown, Globe, LogOut, Moon, MonitorSmartphone, QrCode, Share2, Sun } from "lucide-react-native";
 import Constants from "expo-constants";
 import React from "react";
 import { Alert, Pressable, Share, StyleSheet, Text, View } from "react-native";
@@ -161,7 +161,7 @@ export default function SettingsScreen() {
             return (
               <Pressable
                 key={value}
-                onPress={(e) => setMode(value, { x: e.nativeEvent.pageX, y: e.nativeEvent.pageY })}
+                onPress={() => setMode(value)}
                 style={{ flex: 1 }}
               >
                 <GlassSurface
@@ -195,7 +195,7 @@ export default function SettingsScreen() {
       <Pressable onPress={() => router.push("/business-profile")}>
         <Card style={styles.menuRow}>
           <View style={styles.menuIcon}>
-            <Store size={18} color={colors.primary} />
+            <Building2 size={18} color={colors.primary} />
           </View>
           <Text style={styles.menuText}>
             {isStaff ? t("biz.view_title") : provider ? t("ab.edit_title") : t("tt.create_business")}
@@ -203,6 +203,59 @@ export default function SettingsScreen() {
           <ChevronRight size={18} color={colors.onSurfaceVariant} />
         </Card>
       </Pressable>
+
+      {/* Tarif — faqat biznes egasi uchun ko'rsatiladi */}
+      {!isStaff ? (
+        <Pressable onPress={() => router.push("/plan")}>
+          <Card style={styles.menuRow}>
+            <View style={[styles.menuIcon, { backgroundColor: alpha(colors.tertiaryContainer, 0.25) }]}>
+              <Crown size={18} color={colors.tertiary} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Text style={styles.menuText}>{t("pv.more_plan")}</Text>
+                <View
+                  style={{
+                    paddingHorizontal: 7,
+                    paddingVertical: 2,
+                    borderRadius: radius.sm,
+                    backgroundColor:
+                      provider?.subscription_status === "trial"
+                        ? alpha(colors.tertiaryContainer, 0.35)
+                        : alpha(colors.primaryContainer, 0.35),
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: "800",
+                      color:
+                        provider?.subscription_status === "trial"
+                          ? colors.tertiary
+                          : colors.primary,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {provider?.subscription_status === "trial"
+                      ? t("plan.badge_trial")
+                      : (provider?.plan_code || "pro").toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 12, color: colors.onSurfaceVariant, marginTop: 2 }} numberOfLines={1}>
+                {provider?.subscription_status === "trial"
+                  ? provider?.trial_ends_at
+                    ? `${Math.max(0, Math.ceil((new Date(provider.trial_ends_at).getTime() - Date.now()) / (24 * 3600 * 1000)))} kun sinov muddati qoldi`
+                    : t("plan.status_trial")
+                  : provider?.plan_expires_at
+                  ? `${Math.max(0, Math.ceil((new Date(provider.plan_expires_at).getTime() - Date.now()) / (24 * 3600 * 1000)))} kun faol`
+                  : t("pv.more_plan_sub")}
+              </Text>
+            </View>
+            <ChevronRight size={18} color={colors.onSurfaceVariant} />
+          </Card>
+        </Pressable>
+      ) : null}
 
       {/* Chiqish */}
       <Pressable onPress={handleLogout}>
