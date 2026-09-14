@@ -452,29 +452,33 @@ export const uz = {
   "tt.val_break_end": "{date}: tanaffus tugash vaqti boshlanishdan keyin bo'lishi kerak.",
   "tt.val_duration": "Sozlamalar: kamida bitta uchrashuv davomiyligini qo'shing (aks holda mijozlar bron qila olmaydi).",
 
-  // ── Jadval rejimi (klinika) ──
-  // shared — butun biznesga bitta jadval, individual — har bir shifokor o'ziniki
+  // ── Jadval rejimi (korporativ: klinika, salon, tirnoq, kosmetolog) ──
+  // shared — butun biznesga bitta jadval, individual — har bir xodim o'ziniki
   "sch.mode_title": "Jadval rejimi",
-  "sch.mode_desc": "Klinikada ish vaqti qanday belgilanadi — bir marta hammaga yoki har bir shifokor uchun alohida.",
+  "sch.mode_desc": "Ish vaqti qanday belgilanadi — bir marta hammaga yoki har bir xodim o'zi uchun alohida.",
   "sch.mode_shared": "Hammaga bir xil",
   "sch.mode_individual": "Har kimga alohida",
   "sch.mode_shared_hint":
-    "Jadvalni siz tuzasiz — barcha shifokorlar shu ish vaqtida qabul qiladi.",
+    "Jadvalni siz tuzasiz — barcha xodimlar shu ish vaqtida ishlaydi.",
   "sch.mode_individual_hint":
-    "Har bir shifokor o'z jadvalini o'zi tuzadi — siz uni faqat ko'rasiz.",
+    "Har bir xodim o'z jadvalini o'zi tuzadi — siz uni faqat ko'rasiz.",
+  "sch.need_worker": "Avval ishchi qo'shing",
+  "sch.need_worker_desc":
+    "Bu rejimda jadvalni har bir ishchi o'zi tuzadi. Kamida bitta ishchi qo'shing — uning jadvalini shu yerda ko'rasiz.",
+  "sch.add_worker": "Ishchi qo'shish",
   "sch.mode_saved": "Jadval rejimi yangilandi",
   "sch.mode_failed": "Rejimni o'zgartirib bo'lmadi. Keyinroq urinib ko'ring.",
   "sch.mode_unavailable": "Baza yangilanmagan: providers jadvalida schedule_mode ustuni yo'q.",
   "sch.readonly": "Faqat ko'rish",
   "sch.owner_readonly":
-    "Bu rejimda jadvalni har bir shifokor o'zi tuzadi. Siz uni faqat ko'rasiz — tahrirlash uchun rejimni \"Hammaga bir xil\" ga o'zgartiring.",
+    "Bu rejimda jadvalni har bir xodim o'zi tuzadi. Siz uni faqat ko'rasiz — tahrirlash uchun rejimni \"Hammaga bir xil\" ga o'zgartiring.",
   "sch.staff_readonly":
-    "Klinika jadvali hamma uchun bir xil — uni klinika rahbari belgilaydi. Siz uni faqat ko'rasiz.",
-  "sch.business_title": "Klinika jadvali",
+    "Jadval hamma uchun bir xil — uni biznes rahbari belgilaydi. Siz uni faqat ko'rasiz.",
+  "sch.business_title": "Umumiy jadval",
   "sch.card_desc_readonly":
     "Yoqilgan kunlar va ularning ish vaqtlari — mijozlar aynan shu vaqtlarni ko'radi.",
-  "sch.more_shared_sub": "Klinika ish vaqti (faqat ko'rish)",
-  "sch.more_individual_sub": "Shifokorlar jadvalini ko'rish",
+  "sch.more_shared_sub": "Umumiy ish vaqti (faqat ko'rish)",
+  "sch.more_individual_sub": "Xodimlar jadvalini ko'rish",
 
   // ── Biznes qo'shish ──
   "ab.title": "Biznes profili yaratish",
@@ -513,12 +517,67 @@ export const uz = {
   "ab.mode_slots": "Vaqt bo'yicha",
   "ab.mode_table": "Stol / joy bo'yicha",
   "ab.mode_daily": "Sutkalik",
+  "ab.business_type": "Biznes formati",
+  "ab.type_corporate": "Korporativ",
+  "ab.type_individual": "Individual",
+  "ab.type_help":
+    "Korporativ — biznesingizda ishchilar bor: har biriga login berasiz, jadval hammaga bir xil yoki har kimga alohida bo'ladi.\nIndividual — xizmatni faqat o'zingiz ko'rsatasiz.",
   "cat_grp.all": "Barchasi",
   "cat_grp.services": "Xizmatlar",
   "cat_grp.corporate": "Korporativ (Shifoxona)",
   "cat_grp.daily": "Kunlik / Sutkalik",
-  "cat_grp.dining": "Restoran va Hordiq",
-  "cat_grp.auto": "Avto servis",
+  "cat_grp.dining": "Restoran va Kafe",
+  "cat_grp.auto": "Avtomoyka",
+  "pv.nav_tables_rooms": "Stollar va xonalar",
+  "pv.more_tables_rooms_sub": "Stollar, VIP xonalar va joylar boshqaruvi",
+  "pv.nav_rooms": "Xonalar",
+  "pv.more_rooms_sub": "Mehmonxona xonalari va narxlari",
+  "pv.nav_cars": "Mashinalar",
+  "pv.more_cars_sub": "Avtopark va kunlik ijara narxlari",
+  "pv.nav_houses": "Uylar",
+  "pv.more_houses_sub": "Kvartira, dacha va kunlik narxlar",
+
+  // ── Xonalar (mehmonxona) va uylar (kvartira, dacha) ──
+  "rm.add_room": "Yangi xona qo'shish",
+  "rm.add_house": "Yangi uy qo'shish",
+  "rm.new_room": "Yangi xona",
+  "rm.new_house": "Yangi uy",
+  "rm.edit_room": "Xonani tahrirlash",
+  "rm.edit_house": "Uyni tahrirlash",
+  "rm.photos": "Rasmlar ({n}/{max})",
+  "rm.add_photo": "Rasm",
+  "rm.max_photos": "Ko'pi bilan {max} ta rasm",
+  "rm.name_room": "Xona nomi / raqami",
+  "rm.name_room_ph": "Masalan: 101 yoki VIP",
+  "rm.name_house": "Uy nomi",
+  "rm.name_house_ph": "Masalan: Kvartira Chilonzor",
+  "rm.type": "Xona turi",
+  "rm.type_add": "Tur yaratish",
+  "rm.type_ph": "Masalan: Komfort, Lyuks",
+  "rm.capacity": "Sig'imi (kishi)",
+  "rm.price": "Kunlik narx (so'm)",
+  "rm.desc": "Tavsif va qulayliklar",
+  "rm.desc_ph": "Masalan: Wi-Fi, konditsioner, nonushta",
+  "rm.err_name": "Nomini kiriting",
+  "rm.err_type": "Xona turini tanlang yoki yarating",
+  "rm.err_price": "Kunlik narxni kiriting",
+  "rm.no_session": "Sessiya topilmadi",
+  "rm.saved": "Saqlandi",
+  "rm.save_error": "Saqlashda xatolik",
+  "rm.delete_room": "Xonani o'chirish",
+  "rm.delete_house": "Uyni o'chirish",
+  "rm.delete_confirm": "Haqiqatan ham o'chirmoqchimisiz?",
+  "rm.delete": "O'chirish",
+  "rm.deleted": "O'chirildi",
+  "rm.delete_error": "O'chirishda xatolik",
+  "rm.error": "Xatolik",
+  "rm.empty_rooms": "Xonalar yo'q",
+  "rm.empty_rooms_desc": "Birinchi xonani qo'shing — mijozlar uni kunlik bron qiladi.",
+  "rm.empty_houses": "Uylar yo'q",
+  "rm.empty_houses_desc": "Birinchi uyni qo'shing — mijozlar uni kunlik bron qiladi.",
+  "rm.people": "{n} kishi",
+  "rm.per_day": "/ sutka",
+  "rm.inactive": "Nofaol",
 
   // ── Biznes profili — faqat ko'rish (klinika xodimi uchun) ──
   "biz.view_title": "Biznes profili",
@@ -1126,10 +1185,80 @@ export const uz = {
     "Ma'lumotlar bazasida pgcrypto kengaytmasi yoqilmagan — administratorga murojaat qiling.",
   "wlg.err_failed": "Xatolik yuz berdi. Qayta urinib ko'ring.",
 
+  // ── SMS kod / tarif muddati ──
+  "auth.otp_wait": "Kodni qayta so'rashdan oldin bir daqiqa kuting.",
+  "plan.trial_days_left": "{days} kun sinov muddati qoldi",
+  "plan.active_days_left": "{days} kun faol",
+
+  // ── Navbat SMS ──
+  "pv.wl_sms_button": "SMS xabar",
+  "pv.wl_sms_sending": "Yuborilmoqda...",
+  "pv.wl_sms_title": "SMS xabarnoma yuborish",
+  "pv.wl_sms_confirm": "{name}ga bo'sh joy ochilgani haqida SMS yuborilsinmi?",
+  "pv.wl_sms_send": "SMS yuborish",
+  "pv.wl_sms_sent": "Mijozga SMS xabarnoma yuborildi!",
+  "pv.wl_sms_error": "Xatolik",
+  "pv.wl_sms_no_phone": "Mijozning telefon raqami ko'rsatilmagan.",
+  "pv.wl_sms_failed": "SMS yuborishda xatolik yuz berdi. Qayta urinib ko'ring.",
+
+  // ── Tarif sotib olish (Click / Payme) ──
+  "plan.current_label": "Joriy holat",
+  "plan.status_expired": "Tarif muddati tugagan",
+  "plan.badge_expired": "Tugagan",
+  "plan.days_left_short": "kun qoldi",
+  "plan.no_expiry": "Muddatsiz",
+  "plan.ends_on": "Tugaydi: {date}",
+  "plan.expired_desc": "Barcha imkoniyatlardan foydalanishni davom ettirish uchun tarifni yangilang.",
+  "plan.choose": "Tarifni tanlang",
+  "plan.cycle_monthly": "Oylik",
+  "plan.cycle_yearly": "Yillik",
+  "plan.per_month": "so'm / oy",
+  "plan.per_year": "so'm / yil",
+  "plan.yearly_monthly_eq": "Oyiga {amount} so'mdan tushadi",
+  "plan.plus_sub": "Kichik bizneslar va salonlar uchun",
+  "plan.pro_sub": "Cheksiz imkoniyatlar va TOP reklama",
+  "plan.recommended": "Tavsiya",
+  "plan.buy_plan": "{plan} sotib olish",
+  "plan.renew": "Uzaytirish",
+  "plan.trial_included": "Sinov davrida bepul",
+  "plan.method_title": "To'lov usuli",
+  "plan.method_unavailable": "Hozircha ulanmagan",
+  "plan.waiting": "{method} to'lovi kutilmoqda…",
+  "plan.waiting_hint": "To'lovni yakunlab ilovaga qayting — tarif avtomatik faollashadi.",
+  "plan.reopen": "To'lov sahifasini ochish",
+  "plan.paid_ok": "To'lov qabul qilindi! {plan} tarifi faollashtirildi 🎉",
+  "plan.checkout_failed": "To'lovni boshlab bo'lmadi. Qayta urinib ko'ring.",
+  "plan.secure_note": "Click va Payme rasmiy to'lov tizimlari orqali xavfsiz to'lov.",
+  "plan.hist_completed": "To'langan",
+  "plan.hist_failed": "Bekor qilingan",
+  "plan.hist_waiting": "Kutilmoqda",
+  "plan.period_month": "1 oy",
+  "plan.period_year": "1 yil",
+
+  // ── Sozlamalar bo'limlari ──
+  "set.section_business": "Biznes",
+  "set.section_app": "Ilova",
+  "set.section_account": "Hisob",
+  "set.qr_row_sub": "Mijoz skaner qilib bron qiladi",
+  "set.version": "versiya {v}",
+
+  // ── Hisobni o'chirish ──
+  "acc.delete": "Hisobni o'chirish",
+  "acc.delete_sub": "Hisob va shaxsiy ma'lumotlaringiz butunlay o'chiriladi",
+  "acc.delete_title": "Hisob o'chirilsinmi?",
+  "acc.delete_confirm":
+    "Bu amalni qaytarib bo'lmaydi. Hisobingizga qayta kira olmaysiz, biznesingiz esa mijozlarga ko'rinmay qoladi.",
+  "acc.delete_btn": "O'chirish",
+  "acc.delete_failed": "Hisobni o'chirib bo'lmadi. Qayta urinib ko'ring.",
+
   // ── 404 ──
   "nf.title": "Sahifa topilmadi",
   "nf.desc": "Siz izlagan sahifa mavjud emas yoki ko'chirilgan bo'lishi mumkin.",
   "nf.home": "Bosh sahifaga qaytish",
+
+  // ── Dashboard Category Banner ──
+  "dash.select_category_banner": "Biznes toifasini tanlang",
+  "dash.select_category_sub": "Xizmatlar va band qilish formatini sozlash uchun bosing",
 } as const;
 
 export type TKey = keyof typeof uz;

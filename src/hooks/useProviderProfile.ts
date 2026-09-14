@@ -22,6 +22,8 @@ export interface ProviderProfile {
   reviews_count: number;
   status: string; // pending | approved | ...
   is_active: boolean;
+  // Biznes formati: corporate (salon/klinika/boshliq+ustalar) yoki individual (yakka usta/mutaxassis)
+  business_type?: "corporate" | "individual" | null;
   // Ustalar o'z narxini belgilaydimi (workers.tsx tugmasi)
   staff_sets_own_price?: boolean;
   phone_number?: string | null;
@@ -36,13 +38,15 @@ export interface ProviderProfile {
   prepayment_percent?: number | null;
   prepayment_amount?: number | null;
 
-  // Tarif (subscription): 60 kunlik bepul PRO sinov, keyin PLUS/PRO — hozircha
-  // ruchnoy tasdiqlanadi (to'lov tizimi ulanmagunicha). plan.tsx shu maydonlarni ishlatadi.
+  // Tarif (subscription): 60 kunlik bepul PRO sinov, keyin PLUS/PRO — Click/Payme orqali
+  // sotib olinadi, to'lov tushganda bazadagi trigger shu maydonlarni yangilaydi.
+  // Holatni utils/plan.ts getSubscription() hisoblaydi.
   plan_code?: "plus" | "pro" | null;
   subscription_status?: "trial" | "active" | "expired" | null;
   trial_ends_at?: string | null;
-  plan_started_at?: string | null;
-  plan_expires_at?: string | null;
+  subscription_ends_at?: string | null;
+  has_paid_at_least_once?: boolean | null;
+  is_featured?: boolean | null;
 
   // Ichki hisob raqam (wallet) — tolov-hisob.sql beradi
   account_number?: string | null;

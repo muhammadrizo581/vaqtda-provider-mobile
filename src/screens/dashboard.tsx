@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Hourglass,
   Settings,
+  Sparkles,
   TrendingDown,
   TrendingUp,
   Trophy,
@@ -200,6 +201,7 @@ function OverviewContent() {
   const { appointments: allAppointments, loading, reload } = useAppointments();
   const { entries: waitlist, reload: reloadWaitlist } = useWaitlistEntries();
   const { wallet, reload: reloadWallet } = useWallet();
+  const { provider } = useProvider();
   const { isStaff, staffId } = useStaffRoleContext();
   const router = useRouter();
 
@@ -377,6 +379,32 @@ function OverviewContent() {
           </GlassIconButton>
         </View>
       </View>
+
+      {/* Kategoriya tanlanmagan bo'lsa ogohlantirish banneri */}
+      {!isStaff && !provider?.category_id && (
+        <Pressable onPress={() => router.push("/business-profile")}>
+          {({ pressed }) => (
+            <GlassSurface
+              style={[styles.categoryAlertCard, pressed && { opacity: 0.85 }]}
+              fallbackStyle={styles.categoryAlertFallback}
+              interactive
+            >
+              <View style={styles.categoryAlertIcon}>
+                <Sparkles size={20} color={colors.primary} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.categoryAlertTitle} numberOfLines={1}>
+                  {t("dash.select_category_banner")}
+                </Text>
+                <Text style={styles.categoryAlertSub} numberOfLines={2}>
+                  {t("dash.select_category_sub")}
+                </Text>
+              </View>
+              <ChevronRight size={18} color={colors.primary} />
+            </GlassSurface>
+          )}
+        </Pressable>
+      )}
 
       {/* Zumrad hero — kunning bosh raqami: bugungi daromad */}
       <View style={styles.hero}>
@@ -690,6 +718,41 @@ const useStyles = makeThemedStyles((colors) =>
   StyleSheet.create({
     headerRow: { flexDirection: "row", alignItems: "flex-start", gap: 12 },
     title: { fontSize: 24, fontWeight: "700", color: colors.onSurface, letterSpacing: -0.5 },
+
+    categoryAlertCard: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 12,
+      padding: 16,
+      borderRadius: radius.xl,
+      borderWidth: 1.5,
+      borderColor: alpha(colors.primary, 0.35),
+      backgroundColor: alpha(colors.primaryContainer, 0.12),
+    },
+    categoryAlertFallback: {
+      backgroundColor: colors.surfaceContainer,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+    },
+    categoryAlertIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: radius.lg,
+      backgroundColor: alpha(colors.primary, 0.15),
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    categoryAlertTitle: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: colors.primary,
+    },
+    categoryAlertSub: {
+      fontSize: 12,
+      color: colors.onSurfaceVariant,
+      marginTop: 2,
+      lineHeight: 16,
+    },
 
     hero: { backgroundColor: colors.primary, borderRadius: radius.xxxl, padding: 20 },
     heroLabel: { fontSize: 13, fontWeight: "600", color: alpha(colors.onPrimary, 0.75) },

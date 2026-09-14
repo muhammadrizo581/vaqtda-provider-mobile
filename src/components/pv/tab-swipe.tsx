@@ -6,6 +6,7 @@ import React from "react";
 import { View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { useStaffRoleContext } from "@/context/StaffRoleContext";
+import { useBookingMode } from "@/hooks/useBookingMode";
 
 // Tartib (tabs)/_layout.tsx dagi triggerlar bilan bir xil bo'lishi shart
 const TABS = ["/", "/appointments", "/chat", "/waitlist", "/queue", "/more"] as const;
@@ -14,11 +15,13 @@ export type TabPath = (typeof TABS)[number];
 export function TabSwipe({ tab, children }: { tab: TabPath; children: React.ReactNode }) {
   const router = useRouter();
   const { isStaff } = useStaffRoleContext();
-  // Shifokorda Navbat(waitlist) yashirin, egada esa Navbat(queue) yashirin —
-  // surish ham yashirin tabga tushib qolmasin
+  const { mode } = useBookingMode();
+  // Shifokorda Navbat(waitlist) yashirin, egada esa Navbat(queue) yashirin;
+  // kunlik ijara va restoran/kafeda navbat yo'q — surish ham yashirin tabga
+  // tushib qolmasin
   const tabs: readonly TabPath[] = isStaff
     ? TABS.filter((x) => x !== "/waitlist")
-    : TABS.filter((x) => x !== "/queue");
+    : TABS.filter((x) => x !== "/queue" && !(x === "/waitlist" && mode !== "slots"));
   const idx = tabs.indexOf(tab);
 
   const go = (dir: 1 | -1) => {

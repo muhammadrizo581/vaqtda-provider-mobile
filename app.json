@@ -11,7 +11,10 @@
     "ios": {
       "bundleIdentifier": "com.vaqtda.provider",
       "icon": "./assets/expo.icon",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.vaqtda.provider",
@@ -48,13 +51,18 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Vaqtda profil va xizmat rasmlarini tanlash uchun galereyaga ruxsat kerak."
+          "photosPermission": "Vaqtda profil va xizmat rasmlarini tanlash uchun galereyaga ruxsat kerak.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Biznesingiz manzilini xaritada aniq belgilash uchun joylashuvga ruxsat kerak."
+          "locationWhenInUsePermission": "Biznesingiz manzilini xaritada aniq belgilash uchun joylashuvga ruxsat kerak.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "motionUsagePermission": false
         }
       ],
       "expo-image",

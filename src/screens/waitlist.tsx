@@ -16,10 +16,9 @@ import {
 } from "@/components/pv/ui";
 import { alpha } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
-import { useProvider } from "@/context/ProviderContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useWaitlistEntries, type WaitlistEntry } from "@/hooks/useWaitlistEntries";
-import { EskizService } from "@/services/eskiz";
+import { notifyWaitlistSlotOpened } from "@/services/sms";
 import { localize } from "@/utils/localize";
 import { formatUzDate } from "@/utils/tashkent";
 
@@ -28,8 +27,7 @@ const hhmm = (t: string | null) => (t ? t.slice(0, 5) : "");
 function WaitlistContent() {
   const colors = useColors();
   const styles = useStyles();
-  const { t, lang } = useLanguage();
-  const { provider } = useProvider();
+  const { t } = useLanguage();
   const { entries, loading, reload, notify } = useWaitlistEntries();
   const [notifyingId, setNotifyingId] = useState<string | null>(null);
 
@@ -76,35 +74,29 @@ function WaitlistContent() {
 
   const handleNotifySlot = (e: WaitlistEntry) => {
     if (!e.client?.phone) {
-      Alert.alert("Xatolik", "Mijozning telefon raqami ko'rsatilmagan.");
+      Alert.alert(t("pv.wl_sms_error"), t("pv.wl_sms_no_phone"));
       return;
     }
-    const pName = localize(provider?.business_name, lang) || provider?.slug || "Vaqtda";
-    const time = e.time_from ? hhmm(e.time_from) : "10:00";
 
     Alert.alert(
-      "SMS xabarnoma yuborish",
-      `${e.client.full_name || "Mijoz"}ga bo'sh joy ochilgani haqida SMS xabar yuborilsinmi?`,
+      t("pv.wl_sms_title"),
+      t("pv.wl_sms_confirm", { name: e.client.full_name || t("chat.client") }),
       [
         { text: t("common.cancel"), style: "cancel" },
         {
-          text: "SMS yuborish",
+          text: t("pv.wl_sms_send"),
           onPress: async () => {
             setNotifyingId(e.id);
-            try {
-              await EskizService.sendWaitlistSlotOpenedSms({
-                phone: e.client!.phone!,
-                providerName: pName,
-                date: e.desired_date,
-                time,
-              });
+            // SMS matni va raqamni server navbat yozuvi bo'yicha o'zi aniqlaydi.
+            // Holat faqat SMS haqiqatan ketgandagina "xabar berilgan" bo'ladi.
+            const res = await notifyWaitlistSlotOpened(e.id);
+            if (res.ok) {
               await notify(e.id);
-              Alert.alert("Muvaffaqiyatli", "Mijozga SMS xabarnoma yuborildi!");
-            } catch {
-              Alert.alert("Xatolik", "SMS yuborishda xatolik yuz berdi");
-            } finally {
-              setNotifyingId(null);
+              Alert.alert(t("pv.wl_sms_sent"));
+            } else {
+              Alert.alert(t("pv.wl_sms_error"), t("pv.wl_sms_failed"));
             }
+            setNotifyingId(null);
           },
         },
       ]
@@ -187,7 +179,7 @@ function WaitlistContent() {
                     <StatusBadge label={st.label} tone={st.tone} />
                     {isWaiting && e.client?.phone ? (
                       <SmallButton
-                        label={isNotifyingThis ? "Yuborilmoqda..." : "SMS xabar"}
+                        label={isNotifyingThis ? t("pv.wl_sms_sending") : t("pv.wl_sms_button")}
                         icon={Send}
                         onPress={() => handleNotifySlot(e)}
                         variant="primary"

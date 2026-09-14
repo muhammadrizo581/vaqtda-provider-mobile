@@ -60,7 +60,6 @@ function RootNavigator() {
             <Stack.Screen name="business-profile" />
             {/* Shifokor taklif kodini kiritib klinikaga bog'lanadi */}
             <Stack.Screen name="join-clinic" />
-            <Stack.Screen name="cards" />
             <Stack.Screen name="payment-settings" />
             <Stack.Screen name="chat/[id]" />
           </Stack.Protected>

@@ -10,12 +10,13 @@ import {
   BarChart3,
   Building2,
   CalendarClock,
+  Car,
   ChevronRight,
   CreditCard,
+  Hotel,
   Layers,
   LogIn,
   LogOut,
-  Monitor,
   Settings,
   Sparkles,
   Stethoscope,
@@ -50,7 +51,7 @@ export default function MoreScreen() {
   const tones = useToneColors();
   const styles = useStyles();
   const { t, lang } = useLanguage();
-  const { mode, unit, usesDepartments, usesStaff } = useBookingMode();
+  const { mode, usesDepartments, usesStaff, categorySlug } = useBookingMode();
   const { user, isAuthenticated, logout } = useAuth();
   const { isStaff, staffName } = useStaffRoleContext();
   const { provider } = useProvider();
@@ -77,20 +78,11 @@ export default function MoreScreen() {
     ]);
   };
 
-  // table rejimida xizmat tushunchasi yo'q — bo'lim "Stollar" yoki "Kompyuterlar"
-  const servicesTitle =
-    mode === "table"
-      ? unit === "computer"
-        ? t("pv.nav_computers")
-        : t("pv.nav_tables")
-      : t("pv.nav_services");
-  const servicesSub =
-    mode === "table"
-      ? unit === "computer"
-        ? t("pv.more_computers_sub")
-        : t("pv.more_tables_sub")
-      : t("pv.more_services_sub");
-  const ServicesIcon = mode === "table" ? (unit === "computer" ? Monitor : Armchair) : Sparkles;
+  const isDining = categorySlug === "restoran" || categorySlug === "kafe" || mode === "table";
+  const isHotel = categorySlug === "mehmonxona";
+  // Kvartira va dacha: xizmat o'rniga uylar (hotel_rooms jadvalida saqlanadi)
+  const isHouseRental = categorySlug === "kvartira" || categorySlug === "dacha";
+  const isCarRental = categorySlug === "avto-ijara";
 
   // Biznes egasi uchun to'liq ro'yxat
   const ownerItems: MoreItem[] = [
@@ -138,15 +130,7 @@ export default function MoreScreen() {
           },
         ]
       : []),
-    {
-      key: "services",
-      icon: ServicesIcon,
-      title: servicesTitle,
-      subtitle: servicesSub,
-      href: "/services" as Href,
-      tone: "secondary",
-    },
-    // Ishchilar (sartaroshxona kabi bizneslar): ishchi qo'shish + login yaratish
+    // Ishchilar (sartaroshxona kabi korporativ bizneslar): ishchi qo'shish + login yaratish
     ...(showWorkersScreen
       ? [
           {
@@ -159,8 +143,34 @@ export default function MoreScreen() {
           },
         ]
       : []),
-    // Restoran (stol rejimi): menyu — mijoz stol bron qilishda oldindan buyurtma qiladi
-    ...(mode === "table" && unit === "table"
+    // Avto-ijara: Mashinalar
+    ...(isCarRental
+      ? [
+          {
+            key: "cars",
+            icon: Car,
+            title: t("pv.nav_cars"),
+            subtitle: t("pv.more_cars_sub"),
+            href: "/cars" as Href,
+            tone: "secondary" as Tone,
+          },
+        ]
+      : []),
+    // Mehmonxona: Xonalar; Kvartira/Dacha: Uylar (bitta ekran, rejimi slugdan)
+    ...(isHotel || isHouseRental
+      ? [
+          {
+            key: "rooms",
+            icon: Hotel,
+            title: isHouseRental ? t("pv.nav_houses") : t("pv.nav_rooms"),
+            subtitle: isHouseRental ? t("pv.more_houses_sub") : t("pv.more_rooms_sub"),
+            href: "/rooms" as Href,
+            tone: "secondary" as Tone,
+          },
+        ]
+      : []),
+    // Restoran va Kafe: Menyu va Stollar
+    ...(isDining
       ? [
           {
             key: "menu",
@@ -170,16 +180,43 @@ export default function MoreScreen() {
             href: "/menu" as Href,
             tone: "tertiary" as Tone,
           },
+          {
+            key: "tables",
+            icon: Armchair,
+            title: t("pv.nav_tables_rooms"),
+            subtitle: t("pv.more_tables_rooms_sub"),
+            href: "/tables" as Href,
+            tone: "secondary" as Tone,
+          },
         ]
       : []),
-    {
-      key: "paycfg",
-      icon: CreditCard,
-      title: t("pv.more_paycfg"),
-      subtitle: t("pv.more_paycfg_sub"),
-      href: "/payment-settings" as Href,
-      tone: "secondary",
-    },
+    // Standart xizmatlar — mashina, stol, xona yoki uy bilan ishlaydigan
+    // bizneslarda xizmat tushunchasi yo'q
+    ...(!isCarRental && !isDining && !isHotel && !isHouseRental
+      ? [
+          {
+            key: "services",
+            icon: Sparkles,
+            title: t("pv.nav_services"),
+            subtitle: t("pv.more_services_sub"),
+            href: "/services" as Href,
+            tone: "secondary" as Tone,
+          },
+        ]
+      : []),
+    // Restoran va kafe/choyxonada oldindan to'lov bo'lmaydi — joyida to'lanadi
+    ...(!isDining
+      ? [
+          {
+            key: "paycfg",
+            icon: CreditCard,
+            title: t("pv.more_paycfg"),
+            subtitle: t("pv.more_paycfg_sub"),
+            href: "/payment-settings" as Href,
+            tone: "secondary" as Tone,
+          },
+        ]
+      : []),
     {
       key: "stats",
       icon: BarChart3,

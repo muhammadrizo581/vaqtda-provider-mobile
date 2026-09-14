@@ -1,6 +1,7 @@
 // provider-register — Yangi provayder (biznes egasi) akkauntini yaratish uchun Supabase Edge Function.
 //
 // Oqim:
+//   0. SMS kodni tekshiradi (send-sms-otp yaratgan, phone_otps jadvalida)
 //   1. Yangi auth foydalanuvchi yaratadi (email, password, email_confirm: true)
 //   2. profiles jadvalida yozuv yaratadi/yangilaydi (full_name, phone, role='provider')
 //   3. providers jadvalida biznes yaratadi (business_name, phone_number, slug, status='approved', is_active=true)
@@ -8,6 +9,7 @@
 // Deploy: supabase functions deploy provider-register
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { hashOtp, normalizePhone, OTP_MAX_ATTEMPTS } from "../_shared/otp.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -46,15 +48,35 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const fullName = String(body.full_name ?? "").trim();
-    const phone = String(body.phone ?? "").trim();
+    const phone = normalizePhone(String(body.phone ?? ""));
     const businessName = String(body.business_name ?? "").trim();
     const email = String(body.email ?? "").trim().toLowerCase();
     const password = String(body.password ?? "");
+    const otp = String(body.otp ?? "").trim();
 
     if (!fullName) return json({ error: "name_required" }, 400);
     if (!businessName) return json({ error: "business_name_required" }, 400);
+    if (phone.length !== 12 || !phone.startsWith("998")) return json({ error: "invalid_phone" }, 400);
     if (!email || !email.includes("@")) return json({ error: "email_invalid" }, 400);
     if (password.length < 6) return json({ error: "password_short" }, 400);
+
+    // 0) SMS kodni tekshirish — kod ilovada emas, faqat serverda solishtiriladi
+    const { data: otpRow } = await admin
+      .from("phone_otps")
+      .select("code_hash, attempts, expires_at")
+      .eq("phone", phone)
+      .maybeSingle();
+    if (
+      !otpRow ||
+      new Date(otpRow.expires_at).getTime() < Date.now() ||
+      otpRow.attempts >= OTP_MAX_ATTEMPTS
+    ) {
+      return json({ error: "otp_expired" }, 400);
+    }
+    if (!otp || otpRow.code_hash !== (await hashOtp(phone, otp))) {
+      await admin.from("phone_otps").update({ attempts: otpRow.attempts + 1 }).eq("phone", phone);
+      return json({ error: "otp_invalid" }, 400);
+    }
 
     // 1) Email bandligini tekshirish
     const { data: existingUser } = await admin
@@ -74,7 +96,7 @@ Deno.serve(async (req) => {
       email_confirm: true,
       user_metadata: {
         full_name: fullName,
-        phone: phone,
+        phone: `+${phone}`,
         role: "provider",
       },
     });
@@ -87,26 +109,32 @@ Deno.serve(async (req) => {
       if (msg.includes("password")) {
         return json({ error: "password_short" }, 400);
       }
-      return json({ error: "create_user_failed", details: authError?.message }, 500);
+      console.error("[provider-register] createUser:", authError?.message);
+      return json({ error: "create_user_failed" }, 500);
     }
 
     const userId = authData.user.id;
 
-    // 3) profiles jadvalini yangilash / yaratish
-    await admin
-      .from("profiles")
-      .upsert({
-        id: userId,
-        full_name: fullName,
-        email: email,
-        phone_number: phone,
-        role: "provider",
-        updated_at: new Date().toISOString(),
-      })
-      .select();
+    // 3) profiles — role='provider' bo'lmasa foydalanuvchi panelga kira olmaydi,
+    //    shuning uchun xato bo'lsa akkauntni qaytarib o'chiramiz (yetim akkaunt qolmasin)
+    const { error: profErr } = await admin.from("profiles").upsert({
+      id: userId,
+      full_name: fullName,
+      email,
+      phone: `+${phone}`,
+      role: "provider",
+    });
+    if (profErr) {
+      console.error("[provider-register] profiles:", profErr.message);
+      await admin.auth.admin.deleteUser(userId);
+      return json({ error: "profile_failed" }, 500);
+    }
+
+    // Kod ishlatildi — qayta foydalanib bo'lmasin
+    await admin.from("phone_otps").delete().eq("phone", phone);
 
     // 4) Unique slug yaratish
-    let baseSlug = slugify(businessName);
+    const baseSlug = slugify(businessName);
     let slug = baseSlug;
     let counter = 1;
 
@@ -129,7 +157,7 @@ Deno.serve(async (req) => {
         user_id: userId,
         business_name: businessName,
         slug: slug,
-        phone_number: phone,
+        phone_number: `+${phone}`,
         status: "approved",
         is_active: true,
         created_at: new Date().toISOString(),
@@ -138,8 +166,8 @@ Deno.serve(async (req) => {
       .single();
 
     if (provError) {
+      // Akkaunt tayyor (role=provider) — biznesni ilovadagi "Biznes yaratish" orqali qo'shsa bo'ladi
       console.error("[provider-register] Provider yaratishda xato:", provError);
-      // Profil va user yaratilgan, provider yaratish xato bersa ham ma'lumot beramiz
     }
 
     return json({
@@ -148,8 +176,8 @@ Deno.serve(async (req) => {
       provider_id: providerData?.id,
       slug: slug,
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[provider-register] Server xatosi:", err);
-    return json({ error: "server_error", message: err?.message }, 500);
+    return json({ error: "server_error" }, 500);
   }
 });
