@@ -104,7 +104,7 @@ function WaitlistContent() {
   };
 
   return (
-    <Screen refreshing={loading} onRefresh={reload}>
+    <Screen onRefresh={reload}>
       <PageHeader title={t("pv.wl_title")} />
 
       {/* Statistika */}

@@ -1,31 +1,51 @@
 // Har bir tab ekran uchun umumiy konteyner: xavfsiz maydon + skroll + padding.
-// Pull-to-refresh: mijoz ilovasi (vaqtda-mobile) bilan bir xil — native spinner
-// butunlay yashiriladi (iOS'da opacity: 0), o'rnida Vaqtda barglari chiqadi:
-// iOS'da Apple uslubida tepadagi tortilgan bo'shliq ichida, Android'da kontent
-// tepasida fade + scale bilan. Hammasi VaqtdaRefreshControl/VaqtdaRefreshing ichida.
-import React from "react";
-import { Platform, ScrollView, StyleSheet, View } from "react-native";
+// Pull-to-refresh: ikki platformada ham native RefreshControl (brend rangida).
+// Indikator holatini Screen o'zi boshqaradi — faqat foydalanuvchi tortganda yonadi
+// va onRefresh (Promise) tugaguncha ko'rinib turadi; ekranning dastlabki
+// yuklanishiga bog'lanmaydi.
+// Skroll status bar ostidan boshlanadi — iOS'da native spinner soat/batareya
+// ostida yashirinib qolmaydi.
+import React, { useCallback, useRef, useState } from "react";
+import { Platform, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { liquidGlass } from "@/components/pv/ui";
-import { alpha } from "@/constants/colors";
-import { VaqtdaLoading, VaqtdaRefreshControl, VaqtdaRefreshing } from "@/components/vaqtda-logo";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
+
+// Juda tez tugagan yangilanishda spinner "miltillab" qolmasligi uchun
+const MIN_REFRESH_MS = 600;
 
 export function Screen({
   children,
-  refreshing,
   onRefresh,
   scroll = true,
 }: {
   children: React.ReactNode;
-  refreshing?: boolean;
-  onRefresh?: () => void;
+  /** Tortib yangilash; Promise qaytarsa, tugaguncha indikator turadi */
+  onRefresh?: () => unknown;
   scroll?: boolean;
 }) {
   const styles = useStyles();
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const isIOS = Platform.OS === "ios";
+  const [pulling, setPulling] = useState(false);
+  const busy = useRef(false);
+
+  const handleRefresh = useCallback(async () => {
+    if (!onRefresh || busy.current) return;
+    busy.current = true;
+    setPulling(true);
+    const startedAt = Date.now();
+    try {
+      await onRefresh();
+    } catch {
+      // Xatoni ekranning o'zi ko'rsatadi — indikator baribir yopiladi
+    } finally {
+      const rest = MIN_REFRESH_MS - (Date.now() - startedAt);
+      if (rest > 0) await new Promise((resolve) => setTimeout(resolve, rest));
+      busy.current = false;
+      setPulling(false);
+    }
+  }, [onRefresh]);
 
   if (!scroll) {
     return (
@@ -36,50 +56,32 @@ export function Screen({
   }
 
   return (
-    <View style={styles.root}>
-      <ScrollView showsVerticalScrollIndicator={false}
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
         style={styles.root}
         contentContainerStyle={[
           styles.inner,
           {
-            paddingTop: insets.top + 12,
+            paddingTop: 12,
             // Liquid Glass (iOS) va Telegram suzuvchi tab bari (Android) ostidan kontent o'tadi — pastda joy qoldiramiz
             paddingBottom: liquidGlass || Platform.OS === "android" ? insets.bottom + 96 : 32,
           },
         ]}
-        // iOS: native RefreshControl UMUMAN ishlatilmaydi — uning spinneri turli
-        // iOS versiyalarida baribir ko'rinib qolib, ikkita loading bo'lib ketardi.
-        // Tortib qo'yib yuborilganda o'zimiz aniqlaymiz; indikator — pastdagi overlay.
-        // Android'da bounce yo'q, shuning uchun native RefreshControl qoladi
-        // (spinneri shaffof, ko'rinadigani faqat VaqtdaRefreshing).
         refreshControl={
-          !isIOS && onRefresh ? (
-            <VaqtdaRefreshControl refreshing={!!refreshing} onRefresh={onRefresh} />
+          onRefresh ? (
+            <RefreshControl
+              refreshing={pulling}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+              progressBackgroundColor={colors.surfaceContainerHigh}
+            />
           ) : undefined
         }
-        onScrollEndDrag={
-          isIOS && onRefresh
-            ? (e) => {
-                if (!refreshing && e.nativeEvent.contentOffset.y < -70) onRefresh();
-              }
-            : undefined
-        }
       >
-        {!isIOS && onRefresh ? (
-          <VaqtdaRefreshing refreshing={!!refreshing} color={colors.primary} />
-        ) : null}
         {children}
       </ScrollView>
-      {/* Status bar qatlami — skroll qilingan kontent soat/batareya ostidan ko'rinmasin */}
-      <View
-        pointerEvents="none"
-        style={[styles.statusScrim, { height: insets.top, backgroundColor: alpha(colors.background, 0.96) }]}
-      />
-      {isIOS && onRefresh && refreshing ? (
-        <View pointerEvents="none" style={[styles.iosRefresh, { top: insets.top + 8 }]}>
-          <VaqtdaLoading size={30} color={colors.primary} />
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -88,7 +90,5 @@ const useStyles = makeThemedStyles((colors) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background },
     inner: { paddingHorizontal: 16, gap: 16, flexGrow: 1 },
-    iosRefresh: { position: "absolute", left: 0, right: 0, alignItems: "center", zIndex: 10 },
-    statusScrim: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 5 },
   })
 );

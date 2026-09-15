@@ -276,7 +276,7 @@ function AppointmentsContent() {
   };
 
   return (
-    <Screen refreshing={loading} onRefresh={reload}>
+    <Screen onRefresh={reload}>
       <PageHeader title={t("pv.appts_title")} />
 
       {/* Kun tablari: o'tganlar ← Bugun → kelgusi kunlar; ochilganda Bugun ko'rinib turadi */}

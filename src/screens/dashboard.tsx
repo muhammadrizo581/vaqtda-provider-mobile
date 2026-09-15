@@ -355,14 +355,7 @@ function OverviewContent() {
   );
 
   return (
-    <Screen
-      refreshing={loading}
-      onRefresh={() => {
-        reload();
-        reloadWaitlist();
-        reloadWallet();
-      }}
-    >
+    <Screen onRefresh={() => Promise.all([reload(), reloadWaitlist(), reloadWallet()])}>
       {/* Sarlavha + tezkor tugmalar */}
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
