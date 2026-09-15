@@ -15,7 +15,12 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_CLICK_MERCHANT_ID": "63523",
+        "EXPO_PUBLIC_CLICK_SERVICE_ID": "109024",
+        "EXPO_PUBLIC_PAYME_MERCHANT_ID": "6a71e16f7b78080732c69bd1x"
+      }
     }
   },
   "submit": {
