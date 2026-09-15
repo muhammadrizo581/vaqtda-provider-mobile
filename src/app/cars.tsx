@@ -285,7 +285,7 @@ function CarsContent() {
   const currentImgUri = imageAsset?.uri || imageUrl;
 
   return (
-    <Screen refreshing={loading} onRefresh={load}>
+    <Screen onRefresh={load}>
       <View style={styles.headerRow}>
         <GlassIconButton onPress={() => router.back()}>
           <ArrowLeft size={18} color={colors.onSurfaceVariant} />

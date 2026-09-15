@@ -97,7 +97,7 @@ function ChatListContent() {
   }, [providerId, load]);
 
   return (
-    <Screen refreshing={loading} onRefresh={load}>
+    <Screen onRefresh={load}>
       <PageHeader title={t("chat.title")} />
 
       {loading && conversations.length === 0 ? (

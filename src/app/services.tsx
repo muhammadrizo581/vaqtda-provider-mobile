@@ -417,7 +417,7 @@ function ServicesContent() {
   if (tableMode) {
     const pc = unit === "computer";
     return (
-      <Screen refreshing={loading} onRefresh={load}>
+      <Screen onRefresh={load}>
         <View style={styles.backRow}>
           <GlassIconButton onPress={() => router.back()}>
             <ArrowLeft size={18} color={colors.onSurfaceVariant} />
@@ -517,7 +517,7 @@ function ServicesContent() {
   );
 
   return (
-    <Screen refreshing={loading} onRefresh={load}>
+    <Screen onRefresh={load}>
       <View style={styles.backRow}>
         <GlassIconButton onPress={() => router.back()}>
           <ArrowLeft size={18} color={colors.onSurfaceVariant} />

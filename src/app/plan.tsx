@@ -130,13 +130,7 @@ export default function PlanScreen() {
   };
 
   return (
-    <Screen
-      refreshing={checkout.loading}
-      onRefresh={() => {
-        reloadProvider();
-        checkout.reload();
-      }}
-    >
+    <Screen onRefresh={() => Promise.all([reloadProvider(), checkout.reload()])}>
       <View style={styles.headerRow}>
         <GlassIconButton onPress={() => router.back()}>
           <ArrowLeft size={18} color={colors.onSurfaceVariant} />

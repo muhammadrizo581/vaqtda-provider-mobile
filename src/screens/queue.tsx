@@ -57,7 +57,7 @@ function QueueContent() {
   };
 
   return (
-    <Screen refreshing={loading} onRefresh={reload}>
+    <Screen onRefresh={reload}>
       <PageHeader title={t("pv.queue_title")} subtitle={departmentName || undefined} />
 
       {/* Bo'sh / band tumbler */}

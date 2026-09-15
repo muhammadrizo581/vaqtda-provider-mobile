@@ -394,7 +394,7 @@ export default function StatsScreen() {
   }, [data.trendChart, chartMode]);
 
   return (
-    <Screen refreshing={loading} onRefresh={reload}>
+    <Screen onRefresh={reload}>
       {/* Sarlavha */}
       <View style={styles.headerRow}>
         <GlassIconButton onPress={() => router.back()}>
