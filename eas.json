@@ -6,12 +6,26 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ujpitkwdmbgjfqjcohxf.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_PQMtwUbuLKNLqWbGM8E1dQ_SOvqnrwc",
+        "EXPO_PUBLIC_CLICK_MERCHANT_ID": "63523",
+        "EXPO_PUBLIC_CLICK_SERVICE_ID": "109024",
+        "EXPO_PUBLIC_PAYME_MERCHANT_ID": "6a71e16f7b78080732c69bd1x"
+      }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ujpitkwdmbgjfqjcohxf.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_PQMtwUbuLKNLqWbGM8E1dQ_SOvqnrwc",
+        "EXPO_PUBLIC_CLICK_MERCHANT_ID": "63523",
+        "EXPO_PUBLIC_CLICK_SERVICE_ID": "109024",
+        "EXPO_PUBLIC_PAYME_MERCHANT_ID": "6a71e16f7b78080732c69bd1x"
       }
     },
     "production": {
@@ -19,7 +33,9 @@
       "env": {
         "EXPO_PUBLIC_CLICK_MERCHANT_ID": "63523",
         "EXPO_PUBLIC_CLICK_SERVICE_ID": "109024",
-        "EXPO_PUBLIC_PAYME_MERCHANT_ID": "6a71e16f7b78080732c69bd1x"
+        "EXPO_PUBLIC_PAYME_MERCHANT_ID": "6a71e16f7b78080732c69bd1x",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://ujpitkwdmbgjfqjcohxf.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_PQMtwUbuLKNLqWbGM8E1dQ_SOvqnrwc"
       }
     }
   },

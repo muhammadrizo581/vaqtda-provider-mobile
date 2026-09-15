@@ -66,6 +66,8 @@ function RootNavigator() {
           <Stack.Protected guard={!isAuthed}>
             <Stack.Screen name="login" />
           </Stack.Protected>
+          {/* Foydalanish shartlari — ro'yxatdan o'tishda ham, sozlamalarda ham ochiladi */}
+          <Stack.Screen name="terms" />
         </Stack>
       )}
 

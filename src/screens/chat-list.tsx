@@ -12,6 +12,7 @@ import { Card, ClientAvatar, EmptyState, PageHeader, Spinner } from "@/component
 import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 import { useProvider } from "@/context/ProviderContext";
+import { useBlockedClients } from "@/lib/moderation";
 import { getMemoryCache, readCache, writeCache, TTL_DYNAMIC } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 import { formatChatTime, isImageText } from "@/utils/chat";
@@ -40,6 +41,9 @@ function ChatListContent() {
 
   const [conversations, setConversations] = useState<ChatConversation[]>(initialCache ?? []);
   const [loading, setLoading] = useState<boolean>(!initialCache);
+  // Bloklangan mijozlar bilan suhbatlar ro'yxatda ko'rsatilmaydi
+  const blockedClients = useBlockedClients();
+  const visible = conversations.filter((c) => !blockedClients.has(c.client_id));
 
   const load = useCallback(async () => {
     if (!providerId) return;
@@ -98,12 +102,12 @@ function ChatListContent() {
 
       {loading && conversations.length === 0 ? (
         <Spinner />
-      ) : conversations.length === 0 ? (
+      ) : visible.length === 0 ? (
         <Card>
           <EmptyState icon={MessageCircle} title={t("chat.empty")} desc={t("chat.empty_desc")} />
         </Card>
       ) : (
-        conversations.map((c) => (
+        visible.map((c) => (
           <Pressable key={c.id} onPress={() => router.push(`/chat/${c.id}` as Href)}>
             {({ pressed }) => (
               <Card style={[styles.row, pressed && { opacity: 0.85 }]}>
