@@ -129,6 +129,8 @@ export function useDepartmentQueue() {
           TTL_DYNAMIC
         );
       }
+    } catch {
+      // Tarmoq xatosi — kesh (bo'lsa) ko'rinib qoladi, ushlanmagan xato chiqmaydi
     } finally {
       setLoading(false);
     }

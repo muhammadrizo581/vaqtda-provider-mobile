@@ -1,8 +1,11 @@
 // Provayder paneli uchun kirish va ro'yxatdan o'tish — saytdagi app/login/page.tsx dan port.
 // Eskiz.uz SMS OTP tasdiqlash integratsiyasi bilan.
 import { Image } from "expo-image";
+import * as Linking from "expo-linking";
 import {
   ArrowLeft,
+  CheckCircle2,
+  KeyRound,
   Lock,
   Mail,
   Phone,
@@ -38,10 +41,11 @@ import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors, useTheme } from "@/context/ThemeContext";
 import { supabase } from "@/lib/supabase";
-import { EskizService, formatPhoneNumber, generateOtp } from "@/services/eskiz";
+import { formatPhoneNumber, sendRegistrationOtp } from "@/services/sms";
 
-type Mode = "login" | "register";
+type Mode = "login" | "register" | "forgot";
 type RegisterStep = "form" | "otp";
+type ForgotStep = "email" | "code";
 
 // Bounce'siz, tez so'nuvchi easing — barcha o'tishlar shu bilan
 const ease = Easing.bezier(0.25, 0.1, 0.25, 1);
@@ -114,13 +118,22 @@ export default function LoginScreen() {
 
   // ── OTP Tasdiqlash holatlari ──
   const [regStep, setRegStep] = useState<RegisterStep>("form");
-  const [sentOtp, setSentOtp] = useState<string>("");
   const [enteredOtp, setEnteredOtp] = useState<string>("");
   const [countdown, setCountdown] = useState<number>(0);
   const [resending, setResending] = useState<boolean>(false);
   const otpInputRef = useRef<TextInput>(null);
 
-  // Countdown taymeri
+  // ── Forgot Password holatlari ──
+  const [forgotStep, setForgotStep] = useState<ForgotStep>("email");
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [resetCode, setResetCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [forgotCountdown, setForgotCountdown] = useState<number>(0);
+  const [forgotResending, setForgotResending] = useState<boolean>(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  // Countdown taymeri (SMS OTP)
   useEffect(() => {
     if (countdown <= 0) return;
     const timer = setInterval(() => {
@@ -128,6 +141,15 @@ export default function LoginScreen() {
     }, 1000);
     return () => clearInterval(timer);
   }, [countdown]);
+
+  // Countdown taymeri (Password Reset)
+  useEffect(() => {
+    if (forgotCountdown <= 0) return;
+    const timer = setInterval(() => {
+      setForgotCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [forgotCountdown]);
 
   // Register maydonlari doim mounted turadi — balandligi o'lchanib, bounce'siz
   // timing bilan 0 ↔ to'liq oraliqda ochib-yopiladi.
@@ -146,9 +168,153 @@ export default function LoginScreen() {
   const switchMode = (m: Mode) => {
     setMode(m);
     setRegStep("form");
+    setForgotStep("email");
     setEnteredOtp("");
-    setSentOtp("");
+    setResetCode("");
+    setNewPassword("");
+    setConfirmPassword("");
     setError(null);
+    setSuccessMsg(null);
+  };
+
+  const handleOpenForgot = () => {
+    setForgotEmail(email.trim());
+    setMode("forgot");
+    setForgotStep("email");
+    setError(null);
+    setSuccessMsg(null);
+  };
+
+  // Email yoki usernameni aniqlash (login bilan bir xil)
+  const resolveTargetEmail = async (identifier: string): Promise<string | null> => {
+    const clean = identifier.trim();
+    if (!clean) return null;
+    if (clean.includes("@")) return clean;
+
+    try {
+      const { data: resolved } = await supabase.rpc("email_for_username", { uname: clean });
+      let target = (resolved as string | null) || null;
+      if (!target) {
+        const { data: workerEmail } = await supabase.rpc("worker_email_for_username", {
+          p_login: clean,
+        });
+        target = (workerEmail as string | null) || null;
+      }
+      return target;
+    } catch {
+      return null;
+    }
+  };
+
+  // Parolni tiklash linki / kodini yuborish
+  const handleSendPasswordReset = async (isResend = false) => {
+    const rawTarget = forgotEmail.trim();
+    if (!rawTarget) {
+      setError(t("fp.err_enter_email"));
+      return;
+    }
+
+    if (isResend) {
+      if (forgotCountdown > 0 || forgotResending) return;
+      setForgotResending(true);
+    } else {
+      setPending(true);
+    }
+    setError(null);
+    setSuccessMsg(null);
+
+    try {
+      const targetEmail = await resolveTargetEmail(rawTarget);
+      if (!targetEmail || !targetEmail.includes("@")) {
+        setError(t("fp.err_enter_email"));
+        setPending(false);
+        setForgotResending(false);
+        return;
+      }
+
+      const redirectUrl = Linking.createURL("reset-password");
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: redirectUrl,
+      });
+
+      if (resetErr) {
+        setError(resetErr.message || t("fp.err_generic"));
+        setPending(false);
+        setForgotResending(false);
+        return;
+      }
+
+      setForgotEmail(targetEmail);
+      setForgotStep("code");
+      setForgotCountdown(60);
+      setSuccessMsg(isResend ? t("fp.code_resent") : t("fp.code_sent", { email: targetEmail }));
+    } catch (e) {
+      console.error("Password reset error:", e);
+      setError(t(isResend ? "fp.err_resend" : "fp.err_generic"));
+    } finally {
+      setPending(false);
+      setForgotResending(false);
+    }
+  };
+
+  // Kodni tekshirib yangi parol o'rnatish
+  const handleVerifyAndResetPassword = async () => {
+    const cleanCode = resetCode.trim();
+    if (!cleanCode) {
+      setError(t("fp.err_complete_code"));
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError(t("fp.err_password_short"));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError(t("fp.err_password_match"));
+      return;
+    }
+
+    setError(null);
+    setSuccessMsg(null);
+    setPending(true);
+
+    try {
+      const { error: verifyErr } = await supabase.auth.verifyOtp({
+        email: forgotEmail.trim(),
+        token: cleanCode,
+        type: "recovery",
+      });
+
+      if (verifyErr) {
+        console.error("verifyOtp error:", verifyErr);
+        setError(t("fp.err_invalid_code"));
+        setPending(false);
+        return;
+      }
+
+      const { error: updateErr } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (updateErr) {
+        console.error("updateUser error:", updateErr);
+        setError(t("fp.err_update"));
+        setPending(false);
+        return;
+      }
+
+      setSuccessMsg(t("fp.password_updated"));
+      setPending(false);
+
+      setTimeout(() => {
+        setEmail(forgotEmail.trim());
+        setPassword(newPassword);
+        switchMode("login");
+      }, 1500);
+    } catch (e) {
+      console.error("Reset password process error:", e);
+      setError(t("fp.err_update"));
+      setPending(false);
+    }
   };
 
   const handleLogin = async () => {
@@ -191,19 +357,14 @@ export default function LoginScreen() {
     setPending(true);
 
     try {
-      // 4 xonali OTP kod generatsiya qilamiz (shablon: Vaqtda ilovasi orqali ro'yxatdan o'tish uchun tasdiqlash kodi: {CODE}...)
-      const generatedCode = generateOtp(4);
-      const fullPhoneNumber = `998${cleanPhone}`;
-
-      const smsRes = await EskizService.sendRegistrationOtp(fullPhoneNumber, generatedCode);
-
-      if (!smsRes.success && smsRes.error && !smsRes.id?.startsWith("dev-mock")) {
-        setError(t("auth.sms_send_error"));
+      // Kod SERVERDA yaratiladi va saqlanadi — ilovaga qaytmaydi, provider-register tekshiradi
+      const smsRes = await sendRegistrationOtp(`998${cleanPhone}`);
+      if (!smsRes.ok) {
+        setError(smsRes.error === "too_many_requests" ? t("auth.otp_wait") : t("auth.sms_send_error"));
         setPending(false);
         return;
       }
 
-      setSentOtp(generatedCode);
       setEnteredOtp("");
       setRegStep("otp");
       setCountdown(60);
@@ -227,13 +388,13 @@ export default function LoginScreen() {
     setResending(true);
 
     try {
-      const generatedCode = generateOtp(4);
-      const cleanPhone = phone.replace(/\D/g, "");
-      const fullPhoneNumber = `998${cleanPhone}`;
+      const smsRes = await sendRegistrationOtp(`998${phone.replace(/\D/g, "")}`);
+      if (!smsRes.ok) {
+        setError(smsRes.error === "too_many_requests" ? t("auth.otp_wait") : t("auth.sms_send_error"));
+        setResending(false);
+        return;
+      }
 
-      await EskizService.sendRegistrationOtp(fullPhoneNumber, generatedCode);
-
-      setSentOtp(generatedCode);
       setEnteredOtp("");
       setCountdown(60);
       setResending(false);
@@ -251,11 +412,6 @@ export default function LoginScreen() {
       return;
     }
 
-    if (enteredOtp !== sentOtp) {
-      setError(t("auth.invalid_otp"));
-      return;
-    }
-
     setError(null);
     setPending(true);
 
@@ -268,6 +424,8 @@ export default function LoginScreen() {
           business_name: businessName.trim(),
           email: email.trim(),
           password,
+          // SMS kod serverda tekshiriladi
+          otp: enteredOtp,
         },
       });
 
@@ -278,11 +436,13 @@ export default function LoginScreen() {
           code = body?.error || "";
         } catch {}
         setError(
-          code === "email_taken"
-            ? t("auth.email_taken")
-            : code === "password_short"
-              ? t("auth.password_short")
-              : t("auth.register_error")
+          code === "otp_invalid" || code === "otp_expired"
+            ? t("auth.invalid_otp")
+            : code === "email_taken"
+              ? t("auth.email_taken")
+              : code === "password_short"
+                ? t("auth.password_short")
+                : t("auth.register_error")
         );
         setPending(false);
         return;
@@ -335,14 +495,18 @@ export default function LoginScreen() {
           <Text style={styles.subtitle}>
             {mode === "login"
               ? t("auth.login_subtitle")
-              : regStep === "otp"
-                ? t("auth.otp_verification")
-                : t("auth.register_subtitle_pv")}
+              : mode === "forgot"
+                ? forgotStep === "email"
+                  ? t("fp.step1_sub")
+                  : t("fp.step2_sub")
+                : regStep === "otp"
+                  ? t("auth.otp_verification")
+                  : t("auth.register_subtitle_pv")}
           </Text>
         </View>
 
-        {/* Rejim almashtirgich — faqat OTP bosqichida bo'lmaganda ko'rinadi */}
-        {regStep === "form" && (
+        {/* Rejim almashtirgich — faqat OTP bosqichida yoki parolni tiklashda bo'lmaganda ko'rinadi */}
+        {mode !== "forgot" && regStep === "form" && (
           <GlassSegmented
             options={[
               { key: "login", label: t("auth.login") },
@@ -361,8 +525,202 @@ export default function LoginScreen() {
             </View>
           ) : null}
 
-          {/* ═══════════ REJIM 1: LOGIN YOKI REGISTER FORMA ═══════════ */}
-          {regStep === "form" ? (
+          {successMsg ? (
+            <View style={styles.successBox}>
+              <Text style={styles.successText}>{successMsg}</Text>
+            </View>
+          ) : null}
+
+          {/* ═══════════ REJIM: PAROLNI TIKLASH (FORGOT PASSWORD) ═══════════ */}
+          {mode === "forgot" ? (
+            <View style={styles.otpStepContainer}>
+              {/* Orqaga qaytish tugmasi */}
+              <Pressable
+                style={styles.backRow}
+                onPress={() => switchMode("login")}
+              >
+                <ArrowLeft size={16} color={colors.primary} />
+                <Text style={[styles.backText, { color: colors.primary }]}>
+                  {t("fp.back_login")}
+                </Text>
+              </Pressable>
+
+              {forgotStep === "email" ? (
+                <>
+                  <View style={styles.otpHeader}>
+                    <View
+                      style={[
+                        styles.otpIconBadge,
+                        { backgroundColor: alpha(colors.primary, 0.12) },
+                      ]}
+                    >
+                      <KeyRound size={28} color={colors.primary} />
+                    </View>
+                    <Text style={styles.otpTitle}>{t("fp.step3_title")}</Text>
+                    <Text style={styles.otpSubtitle}>{t("fp.step1_sub")}</Text>
+                  </View>
+
+                  <View style={styles.inputWrap}>
+                    <Mail size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
+                    <TextInput
+                      value={forgotEmail}
+                      onChangeText={(v) => {
+                        setForgotEmail(v);
+                        setError(null);
+                        setSuccessMsg(null);
+                      }}
+                      placeholder={t("fp.email_placeholder")}
+                      placeholderTextColor={colors.outline}
+                      autoCapitalize="none"
+                      keyboardType="email-address"
+                      autoComplete="email"
+                      style={styles.input}
+                      onSubmitEditing={() => handleSendPasswordReset(false)}
+                      autoFocus
+                    />
+                  </View>
+
+                  <Pressable
+                    onPress={() => handleSendPasswordReset(false)}
+                    disabled={pending}
+                    style={({ pressed }) => ({ opacity: pending ? 0.7 : pressed ? 0.9 : 1 })}
+                  >
+                    <GlassSurface
+                      style={styles.submitBtn}
+                      fallbackStyle={{ backgroundColor: colors.primary }}
+                      tintColor={colors.primary}
+                      interactive
+                    >
+                      {pending ? (
+                        <AnimatedLogo
+                          variant="loading"
+                          size={20}
+                          background={null}
+                          foreground={colors.onPrimary}
+                        />
+                      ) : (
+                        <Text style={styles.submitText}>{t("fp.continue")}</Text>
+                      )}
+                    </GlassSurface>
+                  </Pressable>
+                </>
+              ) : (
+                /* Step: kod yuborildi / yangi parol o'rnatish */
+                <>
+                  <View style={styles.otpHeader}>
+                    <View
+                      style={[
+                        styles.otpIconBadge,
+                        { backgroundColor: alpha(colors.primary, 0.12) },
+                      ]}
+                    >
+                      <CheckCircle2 size={28} color={colors.primary} />
+                    </View>
+                    <Text style={styles.otpTitle}>{t("fp.step2_title")}</Text>
+                    <Text style={styles.otpSubtitle}>
+                      {t("fp.code_sent", { email: forgotEmail })}
+                    </Text>
+                  </View>
+
+                  {/* Kod kiritish */}
+                  <View style={styles.inputWrap}>
+                    <KeyRound size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
+                    <TextInput
+                      value={resetCode}
+                      onChangeText={(v) => {
+                        setResetCode(v);
+                        setError(null);
+                      }}
+                      placeholder={t("fp.step2_title")}
+                      placeholderTextColor={colors.outline}
+                      autoCapitalize="none"
+                      style={styles.input}
+                    />
+                  </View>
+
+                  {/* Yangi parol */}
+                  <View style={styles.inputWrap}>
+                    <Lock size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
+                    <TextInput
+                      value={newPassword}
+                      onChangeText={(v) => {
+                        setNewPassword(v);
+                        setError(null);
+                      }}
+                      placeholder={t("fp.new_password")}
+                      placeholderTextColor={colors.outline}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      style={styles.input}
+                    />
+                  </View>
+
+                  {/* Parolni tasdiqlash */}
+                  <View style={styles.inputWrap}>
+                    <Lock size={16} color={colors.onSurfaceVariant} style={styles.inputIcon} />
+                    <TextInput
+                      value={confirmPassword}
+                      onChangeText={(v) => {
+                        setConfirmPassword(v);
+                        setError(null);
+                      }}
+                      placeholder={t("fp.confirm_password")}
+                      placeholderTextColor={colors.outline}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      style={styles.input}
+                      onSubmitEditing={handleVerifyAndResetPassword}
+                    />
+                  </View>
+
+                  {/* Kodni qayta yuborish */}
+                  <View style={styles.resendRow}>
+                    {forgotCountdown > 0 ? (
+                      <Text style={styles.resendTimerText}>
+                        {t("auth.resend_code_in", { seconds: forgotCountdown })}
+                      </Text>
+                    ) : (
+                      <Pressable
+                        onPress={() => handleSendPasswordReset(true)}
+                        disabled={forgotResending}
+                        style={styles.resendBtn}
+                      >
+                        <RotateCcw size={14} color={colors.primary} />
+                        <Text style={[styles.resendBtnText, { color: colors.primary }]}>
+                          {forgotResending ? t("fp.processing") : t("fp.resend")}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
+
+                  {/* Yangilash tugmasi */}
+                  <Pressable
+                    onPress={handleVerifyAndResetPassword}
+                    disabled={pending}
+                    style={({ pressed }) => ({ opacity: pending ? 0.7 : pressed ? 0.9 : 1 })}
+                  >
+                    <GlassSurface
+                      style={styles.submitBtn}
+                      fallbackStyle={{ backgroundColor: colors.primary }}
+                      tintColor={colors.primary}
+                      interactive
+                    >
+                      {pending ? (
+                        <AnimatedLogo
+                          variant="loading"
+                          size={20}
+                          background={null}
+                          foreground={colors.onPrimary}
+                        />
+                      ) : (
+                        <Text style={styles.submitText}>{t("fp.change_password")}</Text>
+                      )}
+                    </GlassSurface>
+                  </Pressable>
+                </>
+              )}
+            </View>
+          ) : regStep === "form" ? (
             <>
               {/* Register maydonlari — balandligi bounce'siz ochilib-yopiladi */}
               <Animated.View style={[styles.fieldsClip, fieldsStyle]}>
@@ -434,6 +792,19 @@ export default function LoginScreen() {
                   onSubmitEditing={handleSubmit}
                 />
               </View>
+
+              {mode === "login" && (
+                <View style={styles.forgotWrap}>
+                  <Pressable
+                    onPress={handleOpenForgot}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Text style={[styles.forgotText, { color: colors.primary }]}>
+                      {t("auth.forgot")}
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
 
               <Pressable
                 onPress={handleSubmit}
@@ -678,6 +1049,28 @@ const useStyles = makeThemedStyles((colors) =>
       fontSize: 12,
       fontWeight: "600",
       textAlign: "center",
+    },
+    successBox: {
+      padding: 12,
+      backgroundColor: alpha(colors.primary, 0.15),
+      borderWidth: 1,
+      borderColor: alpha(colors.primary, 0.4),
+      borderRadius: radius.xl,
+    },
+    successText: {
+      color: colors.primary,
+      fontSize: 12,
+      fontWeight: "600",
+      textAlign: "center",
+    },
+    forgotWrap: {
+      alignItems: "flex-end",
+      marginTop: -4,
+      marginBottom: 4,
+    },
+    forgotText: {
+      fontSize: 13,
+      fontWeight: "600",
     },
     fieldsClip: { overflow: "hidden" },
     fieldsContent: { position: "absolute", top: 0, left: 0, right: 0, gap: 16 },

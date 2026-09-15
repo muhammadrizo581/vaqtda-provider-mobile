@@ -11,22 +11,17 @@ import {
   Check,
   ChevronRight,
   Coffee,
-  Eye,
   Hand,
   Hotel,
   Key,
-  Mic,
   PartyPopper,
   Scissors,
   Search,
-  ShieldCheck,
   Smile,
   Sparkles,
   Stethoscope,
-  SunDim,
   Trees,
   Utensils,
-  Wrench,
   X,
   Zap,
   type LucideIcon,
@@ -36,13 +31,13 @@ import {
   FlatList,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { GlassSurface } from "@/components/pv/ui";
 import { getCategoryImage } from "@/constants/category-images";
 import { alpha, radius } from "@/constants/colors";
@@ -86,39 +81,34 @@ export const CATEGORY_GROUPS: CategoryGroupDef[] = [
   { id: "auto", labelKey: "cat_grp.auto", icon: Car, color: "#06b6d4" },
 ];
 
-// Har bir kategoriyaning qaysi guruhga tegishliligi
+// Har bir kategoriyaning qaysi guruhga tegishliligi (17 ta faol kategoriya)
 export const CATEGORY_TO_GROUP: Record<string, CategoryGroupId> = {
-  // 🏥 Korporativ / Shifoxona va Tibbiyot (bo'limlar, shifokorlar, qabullar)
+  // 🏥 Korporativ / Shifoxona (bo'limlar, shifokorlar)
   klinika: "corporate",
-  stomatolog: "corporate",
 
-  // 📅 Kunlik va Sutkalik ijara (kunbay / sutkabay band qilish)
-  kvartira: "daily",
-  dacha: "daily",
-  mehmonxona: "daily",
-  "avto-ijara": "daily",
-
-  // 🍽️ Restoran, Ovqatlanish va Zallar (stol / joy band qilish)
-  restoran: "dining",
-  kafe: "dining",
-  karaoke: "dining",
-  toyxona: "dining",
-
-  // 🚗 Avto servis va Parvarish
-  avtomoyka: "auto",
-  avtoservis: "auto",
-  detailing: "auto",
-  tonirovka: "auto",
-
-  // ✂️ Usta va Individual xizmatlar (vaqt bo'yicha seanslar)
+  // ✂️ Xizmatlar va Go'zallik (sartaroshxona, salon, tirnoq, kosmetolog, epilyatsiya, stomatolog, fotostudiya, psixolog)
   sartaroshxona: "services",
   "gozallik-saloni": "services",
   tirnoq: "services",
   kosmetolog: "services",
   epilyatsiya: "services",
-  "kiprik-qosh": "services",
+  stomatolog: "services",
   fotostudiya: "services",
   psixolog: "services",
+
+  // 🍽️ Restoran va Kafe (stol va xonalar tanlash)
+  restoran: "dining",
+  kafe: "dining",
+
+  // 📅 Kunlik va Sutkalik ijara (dacha, kvartira, mehmonxona, to'yxona, avto-ijara)
+  dacha: "daily",
+  kvartira: "daily",
+  mehmonxona: "daily",
+  toyxona: "daily",
+  "avto-ijara": "daily",
+
+  // 🚗 Avto (faqat premium avtomoyka)
+  avtomoyka: "auto",
 };
 
 interface CategoryMeta {
@@ -128,27 +118,22 @@ interface CategoryMeta {
 
 const CATEGORY_META: Record<string, CategoryMeta> = {
   sartaroshxona: { icon: Scissors, color: "#10b981" },
-  avtomoyka: { icon: Car, color: "#06b6d4" },
-  mehmonxona: { icon: Hotel, color: "#f59e0b" },
-  stomatolog: { icon: Smile, color: "#0ea5e9" },
-  restoran: { icon: Utensils, color: "#f97316" },
-  fotostudiya: { icon: Camera, color: "#a855f7" },
-  toyxona: { icon: PartyPopper, color: "#ec4899" },
   "gozallik-saloni": { icon: Sparkles, color: "#f43f5e" },
-  kvartira: { icon: Building, color: "#6366f1" },
-  klinika: { icon: Stethoscope, color: "#14b8a6" },
-  kafe: { icon: Coffee, color: "#d97706" },
-  karaoke: { icon: Mic, color: "#8b5cf6" },
   tirnoq: { icon: Hand, color: "#d946ef" },
-  dacha: { icon: Trees, color: "#22c55e" },
-  detailing: { icon: ShieldCheck, color: "#3b82f6" },
-  psixolog: { icon: Brain, color: "#14b8a6" },
-  "avto-ijara": { icon: Key, color: "#ea580c" },
-  tonirovka: { icon: SunDim, color: "#64748b" },
   kosmetolog: { icon: Sparkles, color: "#fb7185" },
   epilyatsiya: { icon: Zap, color: "#eab308" },
-  avtoservis: { icon: Wrench, color: "#ef4444" },
-  "kiprik-qosh": { icon: Eye, color: "#c084fc" },
+  klinika: { icon: Stethoscope, color: "#14b8a6" },
+  stomatolog: { icon: Smile, color: "#0ea5e9" },
+  fotostudiya: { icon: Camera, color: "#a855f7" },
+  psixolog: { icon: Brain, color: "#8b5cf6" },
+  restoran: { icon: Utensils, color: "#f97316" },
+  kafe: { icon: Coffee, color: "#d97706" },
+  dacha: { icon: Trees, color: "#22c55e" },
+  kvartira: { icon: Building, color: "#6366f1" },
+  mehmonxona: { icon: Hotel, color: "#f59e0b" },
+  toyxona: { icon: PartyPopper, color: "#ec4899" },
+  "avto-ijara": { icon: Key, color: "#ea580c" },
+  avtomoyka: { icon: Car, color: "#06b6d4" },
 };
 
 function getCategoryMeta(slug: string): CategoryMeta {

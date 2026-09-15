@@ -7,6 +7,7 @@ import React from "react";
 import { Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { liquidGlass } from "@/components/pv/ui";
+import { alpha } from "@/constants/colors";
 import { VaqtdaLoading, VaqtdaRefreshControl, VaqtdaRefreshing } from "@/components/vaqtda-logo";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
 
@@ -42,8 +43,8 @@ export function Screen({
           styles.inner,
           {
             paddingTop: insets.top + 12,
-            // Liquid Glass tab bar ostidan kontent oqib o'tadi — pastda joy qoldiramiz
-            paddingBottom: liquidGlass ? insets.bottom + 96 : 32,
+            // Liquid Glass (iOS) va Telegram suzuvchi tab bari (Android) ostidan kontent o'tadi — pastda joy qoldiramiz
+            paddingBottom: liquidGlass || Platform.OS === "android" ? insets.bottom + 96 : 32,
           },
         ]}
         // iOS: native RefreshControl UMUMAN ishlatilmaydi — uning spinneri turli
@@ -69,6 +70,11 @@ export function Screen({
         ) : null}
         {children}
       </ScrollView>
+      {/* Status bar qatlami — skroll qilingan kontent soat/batareya ostidan ko'rinmasin */}
+      <View
+        pointerEvents="none"
+        style={[styles.statusScrim, { height: insets.top, backgroundColor: alpha(colors.background, 0.96) }]}
+      />
       {isIOS && onRefresh && refreshing ? (
         <View pointerEvents="none" style={[styles.iosRefresh, { top: insets.top + 8 }]}>
           <VaqtdaLoading size={30} color={colors.primary} />
@@ -83,5 +89,6 @@ const useStyles = makeThemedStyles((colors) =>
     root: { flex: 1, backgroundColor: colors.background },
     inner: { paddingHorizontal: 16, gap: 16, flexGrow: 1 },
     iosRefresh: { position: "absolute", left: 0, right: 0, alignItems: "center", zIndex: 10 },
+    statusScrim: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 5 },
   })
 );

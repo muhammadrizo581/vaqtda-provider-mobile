@@ -97,6 +97,8 @@ export function useAppointments() {
         err = legacy.error;
       }
       if (err) throw err;
+      // Tarif to'lovi buyurtmalari (notes = "SUB__…") mijoz broni emas — ro'yxat va hisobotga kirmaydi
+      bookings = (bookings || []).filter((b: any) => !String(b.notes || "").startsWith("SUB__"));
 
       // Mijoz profillari (ism, telefon, avatar)
       const clientIds = [...new Set((bookings || []).map((b: any) => b.client_id))];

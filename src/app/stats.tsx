@@ -8,31 +8,27 @@ import {
   BarChart3,
   Calendar,
   CalendarCheck,
-  CheckCircle2,
   Clock,
   Gauge,
-  HelpCircle,
   Percent,
   Sparkles,
   TrendingDown,
   TrendingUp,
   Trophy,
-  UserCheck,
   Users,
   Wallet,
-  XCircle,
 } from "lucide-react-native";
 import React, { useMemo, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Screen } from "@/components/pv/screen";
-import { Card, ClientAvatar, GlassIconButton, GlassSurface, Spinner } from "@/components/pv/ui";
+import { ClientAvatar, GlassIconButton, GlassSurface, Spinner } from "@/components/pv/ui";
 import { alpha, radius } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
-import { useProviderStats, type StatBooking } from "@/hooks/useProviderStats";
+import { useProviderStats } from "@/hooks/useProviderStats";
 import { formatSom } from "@/utils/price";
-import { addDaysStr, createTashkentClock, formatUzDate } from "@/utils/tashkent";
+import { addDaysStr, createTashkentClock, dayDiff, formatUzDate } from "@/utils/tashkent";
 import { localize } from "@/utils/localize";
 
 const tashkentClock = createTashkentClock();
@@ -125,8 +121,15 @@ export default function StatsScreen() {
     // O'rtacha chek (AOV)
     const avgCheck = completed.length > 0 ? Math.round(revenue / completed.length) : 0;
 
-    // Kunlik o'rtacha tushum
-    const avgDailyRevenue = days > 0 ? Math.round(revenue / Math.min(days, Math.max(1, currentBookings.length))) : 0;
+    // Kunlik o'rtacha tushum — davrdagi kunlar soniga bo'linadi. "Barchasi"da
+    // birinchi brondan bugungacha o'tgan kunlar olinadi.
+    const firstDate = bookings.reduce<string | null>(
+      (min, b) => (!min || b.booking_date < min ? b.booking_date : min),
+      null
+    );
+    const spanDays =
+      period === "all" ? (firstDate && firstDate <= today ? dayDiff(firstDate, today) + 1 : 1) : days;
+    const avgDailyRevenue = Math.round(revenue / Math.max(1, spanDays));
 
     // Mijozlar: Unikal, Yangi va Qaytgan
     const currentClients = new Set(nonCancelled.map((b) => b.client_id));
@@ -765,7 +768,7 @@ export default function StatsScreen() {
                               {b.client_name || (ru ? "Клиент" : "Mijoz")}
                             </Text>
                             <Text style={styles.bkService} numberOfLines={1}>
-                              {b.service_name || (ru ? "Услуга" : "Xizmat")}
+                              {localize(b.service_name, lang) || (ru ? "Услуга" : "Xizmat")}
                               {b.staff_name ? ` · ${b.staff_name}` : ""}
                             </Text>
                           </View>

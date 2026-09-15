@@ -3,7 +3,7 @@
 import { useRouter } from "expo-router";
 import { AlertCircle, ArrowLeft, Clock, Eye, EyeOff, Lock, Pencil, Plus, Save, Tag, Trash2, X } from "lucide-react-native";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { BusinessGate } from "@/components/pv/business-gate";
 import { Screen } from "@/components/pv/screen";
 import { SelectField } from "@/components/pv/select-field";
@@ -30,7 +30,6 @@ import { getMemoryCache, invalidateCache, readCache, writeCache, TTL_SERVICES } 
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
 import { formatSom } from "@/utils/price";
-import { translateMultilingual } from "@/utils/translate";
 
 interface Service {
   id: string;
@@ -118,7 +117,6 @@ function ServicesContent() {
   const [myDepartmentId, setMyDepartmentId] = useState<string | null>(null);
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!providerId) return;
@@ -226,47 +224,54 @@ function ServicesContent() {
 
   const openEdit = (s: Service) => {
     setEditId(s.id);
-    setName(localize(s.name, lang) || "");
+    const rawName =
+      typeof s.name === "string"
+        ? s.name
+        : s.name?.uz || s.name?.ru || localize(s.name, lang) || "";
+    setName(rawName);
     setPrice(s.price != null ? String(s.price) : "");
     setDuration(s.duration_minutes || 30);
     setCustomDuration(DURATION_PRESETS.includes(s.duration_minutes) ? "" : String(s.duration_minutes));
-    setDescription(localize(s.description, lang) || "");
+    const rawDesc =
+      typeof s.description === "string"
+        ? s.description
+        : s.description?.uz || s.description?.ru || localize(s.description, lang) || "";
+    setDescription(rawDesc);
     setDepartmentId(s.department_id || "");
     setActive(s.is_active);
     setFormOpen(true);
   };
 
-  // Matnni uz/ru/en ga tarjima qiladi (xato bo'lsa oddiy matn qaytadi).
-  const translate = async (text: string): Promise<unknown> => {
-    const clean = text.trim();
-    if (!clean) return null;
-    try {
-      const j = await translateMultilingual(clean);
-      if (j && (j.uz || j.ru || j.en)) return j;
-    } catch {
-      /* tarjima bo'lmasa oddiy matn */
-    }
-    return clean;
-  };
-
   const save = async () => {
     if (!providerId) return;
-    if (!name.trim()) {
+    const cleanName = name.trim();
+    if (!cleanName) {
       showToast(t("svc.name_required"), "error");
       return;
     }
+
+    const cleanPrice = price.trim().replace(/\s/g, "");
+    if (!cleanPrice || isNaN(Number(cleanPrice)) || Number(cleanPrice) <= 0) {
+      showToast(lang === "ru" ? "Укажите цену услуги" : "Xizmat narxini kiriting", "error");
+      return;
+    }
+    const priceNum = Math.round(Number(cleanPrice));
+
     setSaving(true);
     try {
-      const nameVal = await translate(name);
-      const descVal = description.trim() ? await translate(description) : null;
-      const priceNum = price.trim()
-        ? Math.max(0, Math.round(Number(price.replace(/\s/g, ""))))
+      // Nom va tavsif avtomatik tarjima qilinmaydi — foydalanuvchi nima yozsa,
+      // har qanday tilda aynan o'sha matn ko'rinadi.
+      const nameVal = { uz: cleanName, ru: cleanName, en: cleanName };
+      const cleanDesc = description.trim();
+      const descVal = cleanDesc
+        ? { uz: cleanDesc, ru: cleanDesc, en: cleanDesc }
         : null;
+
       const payload: Record<string, unknown> = {
         provider_id: providerId,
         name: nameVal,
         description: descVal,
-        price: Number.isFinite(priceNum as number) ? priceNum : null,
+        price: priceNum,
         // Kunlik rejimda davomiylik 1 kun (1440 daqiqa) qilib belgilanadi
         duration_minutes: daily ? 1440 : Math.max(5, duration),
         is_active: active,
@@ -306,20 +311,56 @@ function ServicesContent() {
     }
   };
 
+  const confirmDelete = (s: Service) => {
+    const sName =
+      typeof s.name === "string"
+        ? s.name
+        : s.name?.uz || s.name?.ru || localize(s.name, lang) || (lang === "ru" ? "Услуга" : "Xizmat");
+    Alert.alert(
+      lang === "ru" ? "Удаление услуги" : "Xizmatni o'chirish",
+      lang === "ru"
+        ? `Вы действительно хотите удалить "${sName}"?`
+        : `Haqiqatan ham "${sName}" xizmatini o'chirmoqchimisiz?`,
+      [
+        { text: t("common.cancel"), style: "cancel" },
+        {
+          text: lang === "ru" ? "Удалить" : "O'chirish",
+          style: "destructive",
+          onPress: () => remove(s.id),
+        },
+      ]
+    );
+  };
+
   const remove = async (id: string) => {
-    setDeleteId(null);
+    // 1. To'g'ridan-to'g'ri o'chirish
     const { error } = await supabase.from("services").delete().eq("id", id);
     if (error) {
-      showToast(t("svc.save_failed"), "error");
-      return;
+      // Bronlar bog'langan bo'lsa (FK cheklovi), xizmatni o'chirish o'rniga yashiramiz
+      const { error: softErr } = await supabase
+        .from("services")
+        .update({ is_active: false })
+        .eq("id", id);
+
+      if (softErr) {
+        showToast(lang === "ru" ? "Не удалось удалить услугу" : "Xizmatni o'chirib bo'lmadi", "error");
+        return;
+      }
+      showToast(
+        lang === "ru"
+          ? "Услуга скрыта из-за существующих записей"
+          : "Xizmatda buyurtmalar borligi uchun yashirildi"
+      );
+    } else {
+      showToast(t("svc.deleted"));
     }
+
     setServices((prev) => {
       const next = prev.filter((s) => s.id !== id);
       if (servicesCacheKey) writeCache(servicesCacheKey, next, TTL_SERVICES).catch(() => {});
       return next;
     });
     invalidateCache(`services.${providerId}`).catch(() => {});
-    showToast(t("svc.deleted"));
   };
 
   const toggleActive = async (s: Service) => {
@@ -460,29 +501,16 @@ function ServicesContent() {
               )}
             </GlassSurface>
           </Pressable>
-          {deleteId === s.id ? (
-            <Pressable onPress={() => remove(s.id)}>
-              <GlassSurface
-                style={styles.deleteConfirm}
-                fallbackStyle={{ backgroundColor: colors.errorContainer }}
-                tintColor={alpha(colors.errorContainer, 0.6)}
-                interactive
-              >
-                <Text style={styles.deleteConfirmText}>{t("svc.delete_q")}</Text>
-              </GlassSurface>
-            </Pressable>
-          ) : (
-            <Pressable onPress={() => setDeleteId(s.id)}>
-              <GlassSurface
-                style={styles.deleteBtn}
-                fallbackStyle={styles.deleteBtnFallback}
-                tintColor={alpha(colors.errorContainer, 0.3)}
-                interactive
-              >
-                <Trash2 size={14} color={colors.error} />
-              </GlassSurface>
-            </Pressable>
-          )}
+          <Pressable onPress={() => confirmDelete(s)}>
+            <GlassSurface
+              style={styles.deleteBtn}
+              fallbackStyle={styles.deleteBtnFallback}
+              tintColor={alpha(colors.errorContainer, 0.3)}
+              interactive
+            >
+              <Trash2 size={14} color={colors.error} />
+            </GlassSurface>
+          </Pressable>
         </View>
       ) : null}
     </Card>
@@ -589,7 +617,9 @@ function ServicesContent() {
           )}
 
           <View>
-            <Text style={styles.label}>{t("svc.price")}</Text>
+            <Text style={styles.label}>
+              {t("svc.price")} <Text style={{ color: colors.error }}>*</Text>
+            </Text>
             <TextInput
               value={price}
               onChangeText={(v) => setPrice(v.replace(/[^\d\s]/g, ""))}
@@ -598,7 +628,13 @@ function ServicesContent() {
               placeholderTextColor={colors.outline}
               style={styles.input}
             />
-            <Text style={styles.hint}>{daily ? t("svc.price_daily_hint") : t("svc.price_hint")}</Text>
+            <Text style={styles.hint}>
+              {daily
+                ? t("svc.price_daily_hint")
+                : lang === "ru"
+                ? "Укажите стоимость услуги (обязательно)"
+                : "Xizmat narxini kiriting (majburiy)"}
+            </Text>
           </View>
 
           {/* Kunlik rejimda davomiylik so'ralmaydi — har doim 1 kun */}

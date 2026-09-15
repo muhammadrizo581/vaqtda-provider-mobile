@@ -11,7 +11,6 @@ import {
   Clock,
   Coffee,
   HelpCircle,
-  Layers,
   Lock,
   Plus,
   Save,
@@ -623,9 +622,9 @@ function ScheduleContent() {
     return result;
   };
 
-  // Korporativ biznes: shifoxona / klinika (bo'limlari va xodimlari bor).
-  // Individual bizneslarga (sartaroshxona, yakka usta, dacha va h.k.) bu rejim ko'rinmaydi.
-  const isCorporate = usesDepartments && usesStaff && !isStaff;
+  // Korporativ biznes rahbari: klinika (shifokorlar) yoki salon/tirnoq/kosmetolog
+  // (ishchilar). Individual bizneslarga bu rejim ko'rinmaydi.
+  const isCorporate = usesStaff && !isStaff;
   const [showModeHelp, setShowModeHelp] = useState(false);
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -685,16 +684,17 @@ function ScheduleContent() {
         </View>
         {modeSwitch}
         <Card style={{ paddingBottom: 24 }}>
+          {/* Klinikada shifokorlar /staff da, salon kabi bizneslarda ishchilar /workers da */}
           <EmptyState
-            icon={Stethoscope}
-            title={t("stf.need_staff")}
-            desc={t("stf.need_staff_desc")}
+            icon={usesDepartments ? Stethoscope : Users}
+            title={usesDepartments ? t("stf.need_staff") : t("sch.need_worker")}
+            desc={usesDepartments ? t("stf.need_staff_desc") : t("sch.need_worker_desc")}
           />
           <View style={{ alignItems: "center" }}>
             <SmallButton
-              label={t("stf.add")}
+              label={usesDepartments ? t("stf.add") : t("sch.add_worker")}
               icon={Plus}
-              onPress={() => router.replace("/staff")}
+              onPress={() => router.replace(usesDepartments ? "/staff" : "/workers")}
             />
           </View>
         </Card>
