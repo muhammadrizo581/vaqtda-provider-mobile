@@ -2,6 +2,7 @@
 // Eskiz.uz SMS OTP tasdiqlash integratsiyasi bilan.
 import { Image } from "expo-image";
 import * as Linking from "expo-linking";
+import { useRouter, type Href } from "expo-router";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -109,6 +110,7 @@ export default function LoginScreen() {
 
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
+  const router = useRouter();
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [businessName, setBusinessName] = useState("");
@@ -831,6 +833,37 @@ export default function LoginScreen() {
                   )}
                 </GlassSurface>
               </Pressable>
+
+              {/* Foydalanish shartlariga rozilik (App Store Guideline 1.2) */}
+              {mode === "register" ? (
+                <Text
+                  style={{
+                    color: colors.onSurfaceVariant,
+                    fontSize: 12,
+                    lineHeight: 18,
+                    textAlign: "center",
+                    marginTop: 14,
+                  }}
+                >
+                  {t("mod.consent_1")}
+                  <Text
+                    style={{ color: colors.primary, fontWeight: "700" }}
+                    onPress={() => router.push("/terms" as Href)}
+                  >
+                    {t("mod.terms")}
+                  </Text>
+                  {t("mod.consent_2")}
+                  <Text
+                    style={{ color: colors.primary, fontWeight: "700" }}
+                    onPress={() =>
+                      Linking.openURL("https://telegra.ph/Vaqtda--Privacy-Policy-Maxfiylik-siyosati-09-13")
+                    }
+                  >
+                    {t("mod.privacy")}
+                  </Text>
+                  {t("mod.consent_3")}
+                </Text>
+              ) : null}
             </>
           ) : (
             /* ═══════════ REJIM 2: OTP TASDIQLASH BOSQICHI ═══════════ */

@@ -3,25 +3,27 @@
 //   Biznes (profil, tarif, QR) · Ilova (til, tema) · Hisob (chiqish, o'chirish).
 // QR kod ro'yxatda joy egallamaydi — qatorni bosganda pastdan oyna bo'lib ochiladi.
 import Constants from "expo-constants";
-import { useRouter } from "expo-router";
+import { useRouter, type Href } from "expo-router";
 import {
   ArrowLeft,
   Building2,
   ChevronRight,
   Crown,
+  FileText,
   Globe,
   LogOut,
   MonitorSmartphone,
   Moon,
   QrCode,
   Share2,
+  ShieldCheck,
   Sun,
   Trash2,
   X,
   type LucideIcon,
 } from "lucide-react-native";
 import React, { useState } from "react";
-import { ActivityIndicator, Alert, Modal, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Linking, Modal, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "@/components/pv/screen";
@@ -313,6 +315,20 @@ export default function SettingsScreen() {
               />
             }
           />
+        </Card>
+      </View>
+
+      {/* Huquqiy hujjatlar — App Store talabi */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>{t("set.section_legal")}</Text>
+        <Card>
+          <Row
+            first
+            icon={ShieldCheck}
+            title={t("mod.privacy")}
+            onPress={() => Linking.openURL("https://telegra.ph/Vaqtda--Privacy-Policy-Maxfiylik-siyosati-09-13")}
+          />
+          <Row icon={FileText} title={t("mod.terms")} onPress={() => router.push("/terms" as Href)} />
         </Card>
       </View>
 
