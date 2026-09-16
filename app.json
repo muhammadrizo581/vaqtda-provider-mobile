@@ -10,7 +10,6 @@
     "backgroundColor": "#0b0d12",
     "ios": {
       "bundleIdentifier": "com.vaqtda.provider",
-      "icon": "./assets/expo.icon",
       "supportsTablet": false,
       "config": {
         "usesNonExemptEncryption": false
