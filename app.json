@@ -65,7 +65,7 @@
           "locationWhenInUsePermission": "Biznesingiz manzilini xaritada aniq belgilash uchun joylashuvga ruxsat kerak.",
           "locationAlwaysAndWhenInUsePermission": false,
           "locationAlwaysPermission": false,
-          "motionUsagePermission": false
+          "motionUsagePermission": "Xaritada joylashuvni aniqroq ko'rsatish uchun harakat sensori ma'lumotlaridan foydalaniladi."
         }
       ],
       "expo-image",
