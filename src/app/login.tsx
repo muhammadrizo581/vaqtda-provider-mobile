@@ -119,6 +119,8 @@ export default function LoginScreen() {
   const [pending, setPending] = useState(false);
 
   // ── OTP Tasdiqlash holatlari ──
+  // Foydalanish shartlariga rozilik — belgilanmasa ro'yxatdan o'tib bo'lmaydi
+  const [accepted, setAccepted] = useState(false);
   const [regStep, setRegStep] = useState<RegisterStep>("form");
   const [enteredOtp, setEnteredOtp] = useState<string>("");
   const [countdown, setCountdown] = useState<number>(0);
@@ -352,6 +354,10 @@ export default function LoginScreen() {
     }
     if (password.length < 6) {
       setError(t("auth.password_short"));
+      return;
+    }
+    if (!accepted) {
+      setError(t("mod.consent_required"));
       return;
     }
 
@@ -808,10 +814,65 @@ export default function LoginScreen() {
                 </View>
               )}
 
+              {/* Foydalanish shartlariga rozilik — belgilanmasa ro'yxatdan o'tib
+                  bo'lmaydi (App Store Guideline 1.2) */}
+              {mode === "register" ? (
+                <Pressable
+                  onPress={() => setAccepted((v) => !v)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: accepted }}
+                  style={{ flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 16 }}
+                >
+                  <View
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 6,
+                      borderWidth: 1.5,
+                      borderColor: accepted ? colors.primary : colors.outline,
+                      backgroundColor: accepted ? colors.primary : "transparent",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginTop: 1,
+                    }}
+                  >
+                    {accepted ? <CheckCircle2 size={16} color={colors.onPrimary} /> : null}
+                  </View>
+                  <Text
+                    style={{
+                      flex: 1,
+                      color: colors.onSurfaceVariant,
+                      fontSize: 12.5,
+                      lineHeight: 18,
+                    }}
+                  >
+                    {t("mod.consent_1")}
+                    <Text
+                      style={{ color: colors.primary, fontWeight: "700" }}
+                      onPress={() => router.push("/terms" as Href)}
+                    >
+                      {t("mod.terms")}
+                    </Text>
+                    {t("mod.consent_2")}
+                    <Text
+                      style={{ color: colors.primary, fontWeight: "700" }}
+                      onPress={() =>
+                        Linking.openURL("https://telegra.ph/Vaqtda--Privacy-Policy-Maxfiylik-siyosati-09-13")
+                      }
+                    >
+                      {t("mod.privacy")}
+                    </Text>
+                    {t("mod.consent_3")}
+                  </Text>
+                </Pressable>
+              ) : null}
+
               <Pressable
                 onPress={handleSubmit}
-                disabled={pending}
-                style={({ pressed }) => ({ opacity: pending ? 0.7 : pressed ? 0.9 : 1 })}
+                disabled={pending || (mode === "register" && !accepted)}
+                style={({ pressed }) => ({
+                  opacity: pending || (mode === "register" && !accepted) ? 0.6 : pressed ? 0.9 : 1,
+                })}
               >
                 <GlassSurface
                   style={styles.submitBtn}
@@ -833,37 +894,6 @@ export default function LoginScreen() {
                   )}
                 </GlassSurface>
               </Pressable>
-
-              {/* Foydalanish shartlariga rozilik (App Store Guideline 1.2) */}
-              {mode === "register" ? (
-                <Text
-                  style={{
-                    color: colors.onSurfaceVariant,
-                    fontSize: 12,
-                    lineHeight: 18,
-                    textAlign: "center",
-                    marginTop: 14,
-                  }}
-                >
-                  {t("mod.consent_1")}
-                  <Text
-                    style={{ color: colors.primary, fontWeight: "700" }}
-                    onPress={() => router.push("/terms" as Href)}
-                  >
-                    {t("mod.terms")}
-                  </Text>
-                  {t("mod.consent_2")}
-                  <Text
-                    style={{ color: colors.primary, fontWeight: "700" }}
-                    onPress={() =>
-                      Linking.openURL("https://telegra.ph/Vaqtda--Privacy-Policy-Maxfiylik-siyosati-09-13")
-                    }
-                  >
-                    {t("mod.privacy")}
-                  </Text>
-                  {t("mod.consent_3")}
-                </Text>
-              ) : null}
             </>
           ) : (
             /* ═══════════ REJIM 2: OTP TASDIQLASH BOSQICHI ═══════════ */
