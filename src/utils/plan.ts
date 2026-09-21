@@ -4,8 +4,15 @@
 // Bazadagi ustunlar (providers): subscription_status ('trial' | 'active' | 'expired'),
 // plan_code ('plus' | 'pro'), trial_ends_at, subscription_ends_at.
 // Muddat tugashini hech qanday cron 'expired' ga o'tkazmaydi — shu sabab sanadan hisoblanadi.
+import { Platform } from "react-native";
 import type { ProviderProfile } from "@/hooks/useProviderProfile";
 import type { TKey } from "@/locales/uz";
+
+// App Store qoidasi (Guideline 3.1.1 / 3.1.3(f)): tarif Apple In-App Purchase orqali
+// sotilmaydi, shu sabab iOS'da tarifga oid hech narsa ko'rsatilmaydi — na Tarif ekrani,
+// na PLUS/PRO belgilari, na tashqi to'lovga ishora. iOS ilovasi web panelga bepul
+// hamroh (companion). Click/Payme orqali sotib olish Android va web panelda ishlaydi.
+export const PLAN_UI_ENABLED = Platform.OS !== "ios";
 
 type TFunc = (key: TKey, vars?: Record<string, string | number>) => string;
 

@@ -4,10 +4,10 @@
 //   2) subscription-checkout Edge Function buyurtma yaratadi (narx serverda)
 //   3) Click/Payme to'lov sahifasi ochiladi; to'lovni webhook tasdiqlaydi
 //   4) Bazadagi trigger tarifni faollashtiradi — ekran holatni kuzatib, yangilanadi
-import { useRouter } from "expo-router";
+import { Redirect, useRouter } from "expo-router";
 import { ArrowLeft, Check, ChevronRight, Crown, Lock, ShieldCheck, X, Zap } from "lucide-react-native";
 import React, { useState } from "react";
-import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "@/components/pv/screen";
 import { useToast } from "@/components/pv/toast";
@@ -20,7 +20,14 @@ import { useSubscriptionCheckout, type PayMethod } from "@/hooks/useSubscription
 import type { TKey } from "@/locales/uz";
 import { CLICK_ENABLED } from "@/utils/click";
 import { PAYME_ENABLED } from "@/utils/payme";
-import { getSubscription, PLAN_PRICES, TRIAL_DAYS, type BillingCycle, type PlanCode } from "@/utils/plan";
+import {
+  getSubscription,
+  PLAN_PRICES,
+  PLAN_UI_ENABLED,
+  TRIAL_DAYS,
+  type BillingCycle,
+  type PlanCode,
+} from "@/utils/plan";
 import { formatSom } from "@/utils/price";
 
 // To'lov usullari — logotip plitkalari rasmiy brend ranglarida
@@ -28,12 +35,6 @@ const METHODS: { id: PayMethod; label: string; color: string; enabled: boolean }
   { id: "click", label: "Click", color: "#00A5CF", enabled: CLICK_ENABLED },
   { id: "payme", label: "Payme", color: "#00CCCC", enabled: PAYME_ENABLED },
 ];
-
-// App Store qoidasi (Guideline 3.1.1): ilova imkoniyatlarini ochadigan obuna iOS'da faqat
-// Apple In-App Purchase orqali sotilishi mumkin. Shu sabab iOS'da narx, davr tanlovi va
-// sotib olish tugmalari ko'rsatilmaydi — faqat joriy holat, imkoniyatlar va tarix.
-// Click/Payme orqali sotib olish Android (va web panel) da ishlaydi.
-const PURCHASE_ENABLED = Platform.OS !== "ios";
 
 const PLAN_FEATURES: Record<PlanCode, { key: TKey; on: boolean }[]> = {
   plus: [
@@ -68,7 +69,13 @@ function fmtDateTime(iso: string | null | undefined): string {
 
 const methodLabel = (m: string) => (m === "click" ? "Click" : m === "payme" ? "Payme" : m);
 
-export default function PlanScreen() {
+// iOS'da tarif ko'rsatilmaydi (utils/plan.ts PLAN_UI_ENABLED) — havola orqali kelinsa ham bosh sahifaga
+export default function PlanRoute() {
+  if (!PLAN_UI_ENABLED) return <Redirect href="/" />;
+  return <PlanScreen />;
+}
+
+function PlanScreen() {
   const colors = useColors();
   const styles = useStyles();
   const router = useRouter();
@@ -187,7 +194,7 @@ export default function PlanScreen() {
           </Card>
 
           {/* To'lov kutilmoqda — Click/Payme'dan qaytishini kutadi */}
-          {PURCHASE_ENABLED && checkout.pending ? (
+          {checkout.pending ? (
             <Card style={styles.waitCard}>
               <View style={styles.waitTop}>
                 <ActivityIndicator size="small" color={colors.primary} />
@@ -203,8 +210,7 @@ export default function PlanScreen() {
             </Card>
           ) : null}
 
-          {/* Davr tanlovi — faqat sotib olish mumkin bo'lgan platformada */}
-          {PURCHASE_ENABLED ? (
+          {/* Davr tanlovi */}
           <View style={styles.cycleRow}>
             <Text style={styles.sectionLabel}>{t("plan.choose")}</Text>
             <View style={styles.segTrack}>
@@ -231,7 +237,6 @@ export default function PlanScreen() {
               })}
             </View>
           </View>
-          ) : null}
 
           {/* Tariflar */}
           <Card>
@@ -258,15 +263,13 @@ export default function PlanScreen() {
                         {t(code === "pro" ? "plan.pro_sub" : "plan.plus_sub")}
                       </Text>
                     </View>
-                    {PURCHASE_ENABLED ? (
-                      <View style={styles.priceCol}>
-                        <Text style={styles.planPrice}>{formatSom(price)}</Text>
-                        <Text style={styles.planPer}>{t(cycle === "yearly" ? "plan.per_year" : "plan.per_month")}</Text>
-                      </View>
-                    ) : null}
+                    <View style={styles.priceCol}>
+                      <Text style={styles.planPrice}>{formatSom(price)}</Text>
+                      <Text style={styles.planPer}>{t(cycle === "yearly" ? "plan.per_year" : "plan.per_month")}</Text>
+                    </View>
                   </View>
 
-                  {PURCHASE_ENABLED && cycle === "yearly" ? (
+                  {cycle === "yearly" ? (
                     <Text style={styles.planEq}>
                       {t("plan.yearly_monthly_eq", { amount: formatSom(Math.round(price / 12)) })}
                     </Text>
@@ -281,25 +284,21 @@ export default function PlanScreen() {
                     ))}
                   </View>
 
-                  {PURCHASE_ENABLED ? (
-                    <SmallButton
-                      label={action.label}
-                      variant={action.primary ? "primary" : "outline"}
-                      disabled={action.disabled || !!checkout.pending}
-                      onPress={() => setSheetPlan(code)}
-                    />
-                  ) : null}
+                  <SmallButton
+                    label={action.label}
+                    variant={action.primary ? "primary" : "outline"}
+                    disabled={action.disabled || !!checkout.pending}
+                    onPress={() => setSheetPlan(code)}
+                  />
                 </View>
               );
             })}
           </Card>
 
-          {PURCHASE_ENABLED ? (
-            <View style={styles.secureRow}>
-              <ShieldCheck size={13} color={colors.onSurfaceVariant} />
-              <Text style={styles.secureText}>{t("plan.secure_note")}</Text>
-            </View>
-          ) : null}
+          <View style={styles.secureRow}>
+            <ShieldCheck size={13} color={colors.onSurfaceVariant} />
+            <Text style={styles.secureText}>{t("plan.secure_note")}</Text>
+          </View>
 
           {/* To'lovlar tarixi */}
           {checkout.history.length > 0 ? (
