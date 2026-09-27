@@ -36,7 +36,7 @@ import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { makeThemedStyles, useColors, useTheme, useToneColors, type ThemeMode } from "@/context/ThemeContext";
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
-import { planStatusSubtitle } from "@/utils/plan";
+import { PLAN_UI_ENABLED, planStatusSubtitle } from "@/utils/plan";
 
 // ── Guruh ichidagi bitta qator ──
 function Row({
@@ -251,8 +251,8 @@ export default function SettingsScreen() {
             title={isStaff ? t("biz.view_title") : provider ? t("ab.edit_title") : t("tt.create_business")}
             onPress={() => router.push("/business-profile")}
           />
-          {/* Tarif — faqat biznes egasi uchun */}
-          {!isStaff ? (
+          {/* Tarif — faqat biznes egasi uchun; iOS'da ko'rsatilmaydi (App Store 3.1.1) */}
+          {!isStaff && PLAN_UI_ENABLED ? (
             <Row
               icon={Crown}
               tone="tertiary"

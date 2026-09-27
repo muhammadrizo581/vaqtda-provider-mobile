@@ -38,7 +38,7 @@ import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { getMemoryCache, invalidateCache, readCache, writeCache, TTL_STATIC } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
-import { planStatusSubtitle } from "@/utils/plan";
+import { PLAN_UI_ENABLED, planStatusSubtitle } from "@/utils/plan";
 import { translateMultilingual } from "@/utils/translate";
 
 interface PickedImage {
@@ -563,8 +563,8 @@ export default function BusinessProfileScreen() {
           </Text>
         </View>
 
-        {/* Tarif holati — faqat biznes egasi uchun */}
-        {!readOnly && provider ? (
+        {/* Tarif holati — faqat biznes egasi uchun; iOS'da ko'rsatilmaydi (App Store 3.1.1) */}
+        {!readOnly && provider && PLAN_UI_ENABLED ? (
           <Pressable onPress={() => router.push("/plan")}>
             <GlassSurface style={styles.planBanner} fallbackStyle={styles.planBannerFallback} interactive>
               <View style={[styles.planBannerIcon, { backgroundColor: alpha(colors.tertiaryContainer, 0.25) }]}>
