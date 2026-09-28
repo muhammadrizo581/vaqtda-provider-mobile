@@ -7,7 +7,6 @@ import {
   CheckCircle2,
   Clock,
   CreditCard,
-  History,
   Receipt,
   Wallet,
   X,
@@ -17,7 +16,6 @@ import {
   ActivityIndicator,
   Image,
   Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -32,7 +30,6 @@ import {
   GlassIconButton,
   GlassSurface,
   PaymentMethodBadge,
-  SmallButton,
   Spinner,
   StatCard,
   StatusBadge,
@@ -182,10 +179,6 @@ export default function CardsScreen() {
   );
   const paymeTotal = useMemo(
     () => paidPayments.filter((p) => p.method === "payme").reduce((s, p) => s + Number(p.amount || 0), 0),
-    [paidPayments]
-  );
-  const cashTotal = useMemo(
-    () => paidPayments.filter((p) => p.method === "cash").reduce((s, p) => s + Number(p.amount || 0), 0),
     [paidPayments]
   );
   const totalOnlineEarned = clickTotal + paymeTotal;
@@ -448,7 +441,7 @@ export default function CardsScreen() {
                     <GlassSurface key={item.id} style={styles.payoutItem}>
                       <View style={styles.payoutItemTop}>
                         <View style={styles.payoutAmountCol}>
-                          <Text style={styles.payoutAmount}>{formatSom(item.amount)} so'm</Text>
+                          <Text style={styles.payoutAmount}>{`${formatSom(item.amount)} so'm`}</Text>
                           <Text style={styles.payoutDate}>
                             {new Date(item.created_at).toLocaleDateString("uz-UZ", {
                               day: "2-digit",
@@ -539,7 +532,7 @@ export default function CardsScreen() {
               {/* Mavjud Balans Box */}
               <View style={styles.modalBalanceBox}>
                 <Text style={styles.modalBalanceLabel}>Mavjud Balans:</Text>
-                <Text style={styles.modalBalanceVal}>{formatSom(availableBalance)} so'm</Text>
+                <Text style={styles.modalBalanceVal}>{`${formatSom(availableBalance)} so'm`}</Text>
               </View>
 
               {/* Karta Raqami */}
@@ -558,7 +551,7 @@ export default function CardsScreen() {
                   placeholderTextColor={colors.onSurfaceVariant}
                   style={styles.modalInput}
                 />
-                <Text style={styles.inputHint}>Pul aynan shu plastik karta raqamiga o'tkazib beriladi.</Text>
+                <Text style={styles.inputHint}>{"Pul aynan shu plastik karta raqamiga o'tkazib beriladi."}</Text>
               </View>
 
               {/* Karta Egasi */}
@@ -626,7 +619,7 @@ export default function CardsScreen() {
 
               <View style={styles.infoNotice}>
                 <Text style={styles.infoNoticeText}>
-                  ℹ️ So'rov yuborilgach, adminlarimiz kartangizga pul o'tkazib berishadi va to'lov chekini biriktirishadi.
+                  {"ℹ️ So'rov yuborilgach, adminlarimiz kartangizga pul o'tkazib berishadi va to'lov chekini biriktirishadi."}
                 </Text>
               </View>
 
@@ -680,7 +673,7 @@ export default function CardsScreen() {
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleRow}>
                 <Receipt size={18} color={colors.primary} />
-                <Text style={styles.modalTitle}>To'lov Cheki</Text>
+                <Text style={styles.modalTitle}>{"To'lov Cheki"}</Text>
               </View>
               <TouchableOpacity
                 onPress={() => setViewingReceiptUrl(null)}

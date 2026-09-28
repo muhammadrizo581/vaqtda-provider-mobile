@@ -36,14 +36,14 @@ export interface Appointment {
   // Shu bron uchun allaqachon to'langan summa (oldindan to'lov + qolgani).
   // Qolgan summa = (price || 0) − paid_amount.
   paid_amount: number;
-  payments?: Array<{
+  payments?: {
     id: string;
     amount: number;
     method: string;
     status: string;
     kind?: string;
     paid_at?: string | null;
-  }>;
+  }[];
 }
 
 export function useAppointments() {
