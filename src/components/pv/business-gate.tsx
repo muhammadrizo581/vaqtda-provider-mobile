@@ -13,6 +13,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { useProvider } from "@/context/ProviderContext";
 import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
+import { REGISTRATION_ENABLED } from "@/utils/plan";
 import { EmptyState, SmallButton, Spinner } from "./ui";
 
 export function BusinessGate({ children }: { children: React.ReactNode }) {
@@ -34,10 +35,12 @@ export function BusinessGate({ children }: { children: React.ReactNode }) {
       <View style={{ flex: 1, justifyContent: "center" }}>
         <EmptyState icon={Store} title={t("tt.no_business_title")} desc={t("tt.no_business_desc")} />
         <View style={{ alignItems: "center", gap: 14 }}>
-          <SmallButton
-            label={t("tt.create_business")}
-            onPress={() => router.push("/business-profile")}
-          />
+          {REGISTRATION_ENABLED && (
+            <SmallButton
+              label={t("tt.create_business")}
+              onPress={() => router.push("/business-profile")}
+            />
+          )}
           {/* Ikkilamchi yo'l: klinikada ishlaydigan shifokor kod bilan kiradi */}
           <Pressable onPress={() => router.push("/join-clinic")} hitSlop={8}>
             <View style={styles.joinRow}>

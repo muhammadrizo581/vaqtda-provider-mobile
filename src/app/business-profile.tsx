@@ -38,7 +38,7 @@ import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { getMemoryCache, invalidateCache, readCache, writeCache, TTL_STATIC } from "@/lib/offline-cache";
 import { supabase } from "@/lib/supabase";
 import { localize } from "@/utils/localize";
-import { PLAN_UI_ENABLED, planStatusSubtitle } from "@/utils/plan";
+import { PLAN_UI_ENABLED, REGISTRATION_ENABLED, planStatusSubtitle } from "@/utils/plan";
 import { translateMultilingual } from "@/utils/translate";
 
 interface PickedImage {
@@ -107,6 +107,12 @@ export default function BusinessProfileScreen() {
   const readOnly = isStaff;
 
   const editId = provider?.id || null;
+
+  useEffect(() => {
+    if (!editId && !REGISTRATION_ENABLED) {
+      router.replace("/");
+    }
+  }, [editId, router]);
 
   const [businessName, setBusinessName] = useState("");
   const [slug, setSlug] = useState("");

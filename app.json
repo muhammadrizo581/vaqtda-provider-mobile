@@ -10,9 +10,11 @@
     "backgroundColor": "#0b0d12",
     "ios": {
       "bundleIdentifier": "com.vaqtda.provider",
+      "buildNumber": "8",
+      "appleTeamId": "CBT9SY2SL9",
       "supportsTablet": false,
-      "config": {
-        "usesNonExemptEncryption": false
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -78,9 +80,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "378384da-4628-403f-8a00-aa49885471d0"
+        "projectId": "73201d78-b69e-427d-aedd-0aa7e2be414c"
       }
     },
-    "owner": "s0nd_x"
+    "owner": "yuldashevqobiljon"
   }
 }
