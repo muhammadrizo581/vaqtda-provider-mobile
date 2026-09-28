@@ -23,6 +23,28 @@ const noopStorage = {
 
 const nativeFetch = globalThis.fetch.bind(globalThis);
 
+async function fetchWithRetry(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  retries = 2
+): Promise<Response> {
+  try {
+    return await nativeFetch(input, init);
+  } catch (error: any) {
+    const msg = String(error?.message || "");
+    const isNetworkLost =
+      msg.includes("The network connection was lost") ||
+      msg.includes("network connection was lost") ||
+      msg.includes("Network request failed") ||
+      msg.includes("fetch failed");
+    if (retries > 0 && isNetworkLost) {
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      return fetchWithRetry(input, init, retries - 1);
+    }
+    throw error;
+  }
+}
+
 function stableHash(value: string): string {
   let hash = 2166136261;
   for (let i = 0; i < value.length; i += 1) {
@@ -43,7 +65,7 @@ async function cachedFetch(input: RequestInfo | URL, init?: RequestInit): Promis
   const isRestRead = method === "GET" && url.includes("/rest/v1/");
 
   if (!isRestRead || isServerRenderer) {
-    const response = await nativeFetch(input, init);
+    const response = await fetchWithRetry(input, init);
     // Ma'lumot o'zgarganda (POST, PATCH, DELETE) eski REST keshlarni tozalaymiz
     if (response.ok && ["POST", "PATCH", "DELETE", "PUT"].includes(method) && url.includes("/rest/v1/")) {
       invalidateCache("rest.").catch(() => {});
@@ -53,7 +75,7 @@ async function cachedFetch(input: RequestInfo | URL, init?: RequestInit): Promis
 
   const cacheKey = `rest.${stableHash(`${url}|${headers.get("authorization") || "anon"}`)}`;
   try {
-    const response = await nativeFetch(input, init);
+    const response = await fetchWithRetry(input, init);
     if (response.ok) {
       // Disk va RAM yozish javobni kutib turmasligi uchun async fon rejimida saqlanadi
       response

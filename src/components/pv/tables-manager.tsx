@@ -35,6 +35,8 @@ export interface RestaurantTable {
 const BULK_MAX = 200;
 // Kompyuter turi uchun tez tanlash chiplari
 const PC_TYPE_PRESETS = ["Standart", "VIP", "Premium", "PlayStation"];
+// Stol / Xona turi uchun tez tanlash chiplari
+const TABLE_TYPE_PRESETS = ["Standart stol", "VIP xona", "Kabina", "Terassa", "Banket zali"];
 
 export function TablesManager({ variant = "table" }: { variant?: "table" | "computer" }) {
   const colors = useColors();
@@ -378,16 +380,26 @@ export function TablesManager({ variant = "table" }: { variant?: "table" | "comp
               </View>
             </View>
           ) : (
-            <View>
-              <Text style={styles.label}>{t("tbl.capacity")}</Text>
-              <TextInput
-                value={capacity}
-                onChangeText={(v) => setCapacity(v.replace(/[^\d]/g, ""))}
-                keyboardType="numeric"
-                placeholder="4"
-                placeholderTextColor={colors.outline}
-                style={[styles.input, { width: 100 }]}
-              />
+            <View style={{ gap: 10 }}>
+              <View>
+                <Text style={styles.label}>Stol / Xona turi</Text>
+                <View style={styles.chipRow}>
+                  {TABLE_TYPE_PRESETS.map((p) => (
+                    <SelectPill key={p} label={p} active={typeVal === p} onPress={() => setTypeVal(typeVal === p ? "" : p)} />
+                  ))}
+                </View>
+              </View>
+              <View>
+                <Text style={styles.label}>{t("tbl.capacity")}</Text>
+                <TextInput
+                  value={capacity}
+                  onChangeText={(v) => setCapacity(v.replace(/[^\d]/g, ""))}
+                  keyboardType="numeric"
+                  placeholder="4"
+                  placeholderTextColor={colors.outline}
+                  style={[styles.input, { width: 100 }]}
+                />
+              </View>
             </View>
           )}
           <View style={{ flexDirection: "row", gap: 12 }}>
@@ -428,6 +440,7 @@ export function TablesManager({ variant = "table" }: { variant?: "table" | "comp
                     <Users size={12} color={colors.onSurfaceVariant} />
                     <Text style={styles.rowMetaText}>
                       {tb.capacity} {t("tbl.seats")}
+                      {tb.type ? ` · ${tb.type}` : ""}
                     </Text>
                   </>
                 )}

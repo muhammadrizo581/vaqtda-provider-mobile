@@ -9,6 +9,7 @@
 //   usesStaff       — biznes ichida xodimlar bor (klinikada shifokor,
 //                     sartaroshxonada usta — ikkalasi ham provider_staff)
 // Ikkalasi ham kategoriya qatoridan olinadi; ustun hali qo'shilmagan bo'lsa — false.
+// Yakka (individual) biznesda ikkalasi ham doim o'chiq.
 //
 // hasWorkers — usesStaff ning eski nomi (sartaroshxona konteksti). Mavjud
 // kodlarni buzmaslik uchun alias sifatida qaytariladi.
@@ -20,12 +21,22 @@ import { supabase } from "@/lib/supabase";
 export type BookingMode = "slots" | "table" | "daily";
 export type TableUnit = "table" | "computer";
 
-interface BookingModeCache {
+// Kategoriyaning xom bayroqlari (individual niqobisiz — u qaytarishda qo'llanadi)
+interface CategoryFlags {
   mode: BookingMode;
   unit: TableUnit;
   usesDepartments: boolean;
   usesStaff: boolean;
+  categorySlug: string;
 }
+
+const DEFAULT_FLAGS: CategoryFlags = {
+  mode: "slots",
+  unit: "table",
+  usesDepartments: false,
+  usesStaff: false,
+  categorySlug: "",
+};
 
 export function useBookingMode(): {
   mode: BookingMode;
@@ -34,68 +45,50 @@ export function useBookingMode(): {
   usesStaff: boolean;
   /** @deprecated usesStaff bilan bir xil — yangi kodda usesStaff ishlating */
   hasWorkers: boolean;
+  isIndividual: boolean;
+  categorySlug: string;
   loading: boolean;
 } {
   const { provider } = useProvider();
   const categoryId = provider?.category_id;
-  const cacheKey = categoryId ? `category.mode.${categoryId}` : "";
+  const cacheKey = categoryId ? `category.flags.${categoryId}` : "";
 
-  // 1. RAM xotiradan sinxron o'qish (0ms instant)
-  const initialCache = cacheKey ? getMemoryCache<BookingModeCache>(cacheKey) : null;
-
-  const [mode, setMode] = useState<BookingMode>(initialCache?.mode ?? "slots");
-  const [unit, setUnit] = useState<TableUnit>(initialCache?.unit ?? "table");
-  const [usesDepartments, setUsesDepartments] = useState<boolean>(initialCache?.usesDepartments ?? false);
-  const [usesStaff, setUsesStaff] = useState<boolean>(initialCache?.usesStaff ?? false);
-  const [loading, setLoading] = useState<boolean>(!initialCache && !!categoryId);
+  // Qiymat qaysi kategoriya uchun yuklangani bilan saqlanadi — kategoriya
+  // almashganda eskisi yangisi deb ko'rinib qolmasin
+  const [loaded, setLoaded] = useState<{ key: string; flags: CategoryFlags } | null>(null);
 
   useEffect(() => {
-    if (!categoryId) return;
+    if (!cacheKey) return;
     let cancelled = false;
 
+    // setTimeout — effekt ichida sinxron setState bo'lmasligi uchun
     const timer = setTimeout(async () => {
-      // Disk keshni tezkor tekshiramiz
-      const cached = await readCache<BookingModeCache>(cacheKey);
-      if (cached && !cancelled) {
-        setMode(cached.mode);
-        setUnit(cached.unit);
-        setUsesDepartments(cached.usesDepartments);
-        setUsesStaff(cached.usesStaff);
-        setLoading(false);
-      }
+      const cached = await readCache<CategoryFlags>(cacheKey);
+      if (cached && !cancelled) setLoaded({ key: cacheKey, flags: cached });
 
-      // Supabase'dan yangilash (fon rejimida)
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("categories")
           .select("*")
           .eq("id", categoryId)
           .maybeSingle();
-
+        if (error) throw error;
         if (cancelled) return;
 
         const m = data?.booking_mode;
-        const freshMode: BookingMode = m === "table" || m === "daily" ? m : "slots";
-        const freshUnit: TableUnit = data?.table_unit === "computer" ? "computer" : "table";
-        const freshDepts = data?.uses_departments === true;
-        const freshStaff = data?.uses_staff === true;
-
-        setMode(freshMode);
-        setUnit(freshUnit);
-        setUsesDepartments(freshDepts);
-        setUsesStaff(freshStaff);
-
-        const record: BookingModeCache = {
-          mode: freshMode,
-          unit: freshUnit,
-          usesDepartments: freshDepts,
-          usesStaff: freshStaff,
+        const flags: CategoryFlags = {
+          mode: m === "table" || m === "daily" ? m : "slots",
+          unit: data?.table_unit === "computer" ? "computer" : "table",
+          usesDepartments: data?.uses_departments === true,
+          usesStaff: data?.uses_staff === true,
+          categorySlug: data?.slug || "",
         };
-        await writeCache(cacheKey, record, TTL_CONFIG);
+        setLoaded({ key: cacheKey, flags });
+        await writeCache(cacheKey, flags, TTL_CONFIG);
       } catch {
-        // Tarmoq xatosi bo'lsa kesh yetarli
-      } finally {
-        if (!cancelled) setLoading(false);
+        // Tarmoq xatosi: kesh bo'lsa u qoladi, bo'lmasa standart rejim bilan
+        // davom etamiz — ekranlar cheksiz yuklanishda qolib ketmasin
+        if (!cancelled && !cached) setLoaded({ key: cacheKey, flags: DEFAULT_FLAGS });
       }
     }, 0);
 
@@ -103,7 +96,27 @@ export function useBookingMode(): {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [categoryId, cacheKey]);
+  }, [cacheKey, categoryId]);
 
-  return { mode, unit, usesDepartments, usesStaff, hasWorkers: usesStaff, loading };
+  // Kategoriya yo'q — standart; aks holda shu kategoriya uchun yuklangan qiymat
+  // yoki RAM kesh (0ms). Ikkalasi ham bo'lmasa — hali yuklanmoqda.
+  const flags = !cacheKey
+    ? DEFAULT_FLAGS
+    : loaded?.key === cacheKey
+      ? loaded.flags
+      : getMemoryCache<CategoryFlags>(cacheKey);
+
+  const isIndividual = provider?.business_type === "individual";
+  const usesStaff = !isIndividual && !!flags?.usesStaff;
+
+  return {
+    mode: flags?.mode ?? "slots",
+    unit: flags?.unit ?? "table",
+    usesDepartments: !isIndividual && !!flags?.usesDepartments,
+    usesStaff,
+    hasWorkers: usesStaff,
+    isIndividual,
+    categorySlug: flags?.categorySlug ?? "",
+    loading: !flags,
+  };
 }

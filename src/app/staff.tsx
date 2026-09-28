@@ -558,7 +558,7 @@ function StaffContent() {
   }));
 
   return (
-    <Screen refreshing={loading} onRefresh={load}>
+    <Screen onRefresh={load}>
       <View style={styles.backRow}>
         <GlassIconButton onPress={() => router.back()}>
           <ArrowLeft size={18} color={colors.onSurfaceVariant} />

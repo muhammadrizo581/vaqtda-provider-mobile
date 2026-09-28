@@ -71,6 +71,13 @@ export function addDaysStr(dateStr: string, n: number): string {
   return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
 }
 
+/** Ikki "YYYY-MM-DD" sana orasidagi kunlar farqi (b − a) */
+export function dayDiff(a: string, b: string): number {
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / 86400000);
+}
+
 /** "YYYY-MM-DD" qaysi hafta kuni ("Monday"...) */
 export function weekdayKeyOf(dateStr: string): string {
   const [y, m, d] = dateStr.split("-").map(Number);

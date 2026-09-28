@@ -3,7 +3,7 @@
 // Klinika XODIMI (shifokor) kirgan bo'lsa — barcha raqamlar faqat uning o'z
 // bronlari va o'z jadvali bo'yicha hisoblanadi: so'rovlar shu yerda staff_id
 // bilan cheklanadi, ya'ni shifokorga klinika bo'ylab ma'lumot umuman kelmaydi.
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useProvider } from "@/context/ProviderContext";
 import { useStaffRoleContext } from "@/context/StaffRoleContext";
 import { getMemoryCache, readCache, writeCache, TTL_DYNAMIC } from "@/lib/offline-cache";
@@ -18,7 +18,7 @@ export interface StatBooking {
   duration_minutes: number | null;
   price: number | null;
   service_id: string | null;
-  service_name: string | null;
+  service_name: any;
   staff_id: string | null;
   staff_name: string | null;
   client_name: string | null;
@@ -62,7 +62,7 @@ export function useProviderStats() {
   const [slots, setSlots] = useState<StatSlot[]>(initialCache?.slots ?? []);
   const [payments, setPayments] = useState<StatPayment[]>(initialCache?.payments ?? []);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     if (!providerId || (isStaff && !staffId)) {
       setBookings([]);
       setSlots([]);
@@ -74,7 +74,7 @@ export function useProviderStats() {
     try {
       let bkQ = supabase
         .from("bookings")
-        .select("id, client_id, booking_date, start_time, status, duration_minutes, price, service_id, staff_id, services(name)")
+        .select("id, client_id, booking_date, start_time, status, duration_minutes, price, service_id, staff_id, notes, services(name)")
         .eq("provider_id", providerId)
         .order("booking_date", { ascending: false });
 
@@ -100,7 +100,10 @@ export function useProviderStats() {
         isStaff ? Promise.resolve({ data: [] }) : pmQ,
       ]);
 
-      const rawBookings = bkRes.error ? [] : (bkRes.data as any[]) || [];
+      // Tarif to'lovi buyurtmalari (notes = "SUB__…") daromad statistikasiga kirmaydi
+      const rawBookings = (bkRes.error ? [] : (bkRes.data as any[]) || []).filter(
+        (b) => !String(b.notes || "").startsWith("SUB__")
+      );
       const freshSlots = slRes.error ? [] : (slRes.data as StatSlot[]) || [];
       const freshPayments: StatPayment[] = (pmRes as any)?.data || [];
 
@@ -161,7 +164,7 @@ export function useProviderStats() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [providerId, isStaff, staffId, sharedSchedule, cacheKey]);
 
   useEffect(() => {
     if (providerLoading || roleLoading) return;
@@ -184,7 +187,7 @@ export function useProviderStats() {
       cancelled = true;
       clearTimeout(t);
     };
-  }, [providerId, providerLoading, roleLoading, isStaff, staffId, sharedSchedule, cacheKey]);
+  }, [providerLoading, roleLoading, cacheKey, load]);
 
   return { loading, hasProvider: providerLoading ? null : !!provider, bookings, slots, payments, reload: load };
 }

@@ -1,12 +1,14 @@
 // Chat — bitta suhbat (provayder tomoni).
 // Provayder xabarlari o'ngda (primary), mijozniki chapda. Realtime INSERT/DELETE.
-// Rasm yuborish: expo-image-picker → storage "chat-images" → image_url bilan xabar.
-// O'chirish: o'z xabarini uzoq bosish → tasdiq (Alert).
+// Rasm yuborish: expo-image-picker → storage "assets" (o'z papkamiz) → rasm URL'i
+// body sifatida (mijoz ilovasi bilan bir xil format).
+// Uzoq bosish: o'z xabari → o'chirish; mijoz xabari → shikoyat.
+// Sarlavhadagi menyu: shikoyat qilish / mijozni bloklash (App Store Guideline 1.2).
 import { Image } from "expo-image";
 import * as ImagePicker from "expo-image-picker";
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, ImagePlus, MessageCircle, Send } from "lucide-react-native";
+import { ArrowLeft, ImagePlus, MessageCircle, MoreVertical, Send } from "lucide-react-native";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -26,6 +28,14 @@ import { ClientAvatar, GlassSurface, liquidGlass, Spinner } from "@/components/p
 import { alpha } from "@/constants/colors";
 import { useLanguage } from "@/context/LanguageContext";
 import { makeThemedStyles, useColors } from "@/context/ThemeContext";
+import {
+  blockClient,
+  containsProfanity,
+  pickReportReason,
+  reportChat,
+  unblockClient,
+  useBlockedClients,
+} from "@/lib/moderation";
 import { supabase } from "@/lib/supabase";
 import { chatImageUrl, formatChatDay, formatChatTime } from "@/utils/chat";
 
@@ -34,7 +44,7 @@ interface ChatMessage {
   conversation_id: string;
   sender_role: "client" | "provider";
   body: string | null;
-  image_url: string | null;
+  image_url?: string | null;
   is_read: boolean;
   created_at: string;
 }
@@ -47,6 +57,7 @@ interface ConversationInfo {
 }
 
 const MAX_IMAGE_MB = 5;
+const IMAGE_EXTS = ["jpg", "jpeg", "png", "webp", "gif"];
 
 export default function ChatThreadScreen() {
   const colors = useColors();
@@ -65,6 +76,8 @@ export default function ChatThreadScreen() {
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const scrollRef = useRef<ScrollView | null>(null);
+  const blockedClients = useBlockedClients();
+  const blocked = !!conv?.client_id && blockedClients.has(conv.client_id);
 
   // Mijoz xabarlarini o'qildi deb belgilash + o'z hisoblagichimizni nollash
   const markRead = useCallback(async () => {
@@ -146,6 +159,10 @@ export default function ChatThreadScreen() {
   const send = async () => {
     const text = body.trim();
     if (!text || !conversationId || sending) return;
+    if (containsProfanity(text)) {
+      showToast(t("mod.profanity"), "error");
+      return;
+    }
     setSending(true);
     // Optimistik: darhol ko'rsatamiz
     const tempId = `temp-${Date.now()}`;
@@ -154,7 +171,6 @@ export default function ChatThreadScreen() {
       conversation_id: conversationId,
       sender_role: "provider",
       body: text,
-      image_url: null,
       is_read: false,
       created_at: new Date().toISOString(),
     };
@@ -181,7 +197,8 @@ export default function ChatThreadScreen() {
     setSending(false);
   };
 
-  // Galereyadan rasm tanlash → storage'ga yuklash → image_url bilan xabar
+  // Galereyadan rasm tanlash → "assets" bucket'dagi o'z papkamizga yuklash →
+  // rasm URL'i xabar matni sifatida yuboriladi
   const pickImage = async () => {
     if (!conversationId || uploading) return;
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -196,20 +213,25 @@ export default function ChatThreadScreen() {
     }
     setUploading(true);
     try {
-      const ext = (asset.uri.split(".").pop() || "jpg").toLowerCase();
+      const { data: session } = await supabase.auth.getSession();
+      const uid = session.session?.user.id;
+      if (!uid) throw new Error("not_authenticated");
+      const rawExt = (asset.uri.split(".").pop() || "").toLowerCase();
+      // Mijoz ilovasi rasmni URL kengaytmasidan taniydi
+      const ext = IMAGE_EXTS.includes(rawExt) ? rawExt : "jpg";
       const contentType = asset.mimeType || `image/${ext === "jpg" ? "jpeg" : ext}`;
-      const path = `${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const path = `${uid}/chat/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       // RN'da faylni arraybuffer sifatida o'qib yuklaymiz
       const fileRes = await fetch(asset.uri);
       const buf = await fileRes.arrayBuffer();
       const { error: upErr } = await supabase.storage
-        .from("chat-images")
+        .from("assets")
         .upload(path, buf, { contentType, cacheControl: "3600" });
       if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from("chat-images").getPublicUrl(path);
+      const { data: pub } = supabase.storage.from("assets").getPublicUrl(path);
       const { data, error } = await supabase
         .from("chat_messages")
-        .insert({ conversation_id: conversationId, sender_role: "provider", image_url: pub.publicUrl })
+        .insert({ conversation_id: conversationId, sender_role: "provider", body: pub.publicUrl })
         .select()
         .single();
       if (error || !data) throw error;
@@ -243,6 +265,52 @@ export default function ChatThreadScreen() {
     ]);
   };
 
+  // Mijoz xabari yoki butun suhbat ustidan shikoyat
+  const report = (messageId: string | null) => {
+    if (!conversationId) return;
+    pickReportReason(t, async (reason) => {
+      try {
+        await reportChat(conversationId, messageId, reason);
+        Alert.alert("", t("mod.reported"));
+      } catch {
+        showToast(t("common.error"), "error");
+      }
+    });
+  };
+
+  // Mijozni bloklash / blokdan chiqarish
+  const toggleBlock = () => {
+    const clientId = conv?.client_id;
+    if (!clientId) return;
+    if (blocked) {
+      unblockClient(clientId).catch(() => showToast(t("common.error"), "error"));
+      return;
+    }
+    Alert.alert(t("mod.block"), t("mod.block_client_q"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("mod.block"),
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await blockClient(clientId);
+            showToast(t("mod.blocked_done"), "success");
+          } catch {
+            showToast(t("common.error"), "error");
+          }
+        },
+      },
+    ]);
+  };
+
+  const openMenu = () => {
+    Alert.alert(conv?.client?.full_name || t("mod.options"), undefined, [
+      { text: t("mod.report"), onPress: () => report(null) },
+      { text: blocked ? t("mod.unblock") : t("mod.block"), style: "destructive", onPress: toggleBlock },
+      { text: t("common.cancel"), style: "cancel" },
+    ]);
+  };
+
   return (
     <View style={styles.root}>
       {/* Sarlavha — shisha panel */}
@@ -260,6 +328,11 @@ export default function ChatThreadScreen() {
           </Text>
           <Text style={styles.headerSub}>{t("chat.client")}</Text>
         </View>
+        {conv ? (
+          <Pressable onPress={openMenu} style={styles.backBtn} hitSlop={8} accessibilityLabel={t("mod.options")}>
+            <MoreVertical size={20} color={colors.onSurface} />
+          </Pressable>
+        ) : null}
       </GlassSurface>
 
       <KeyboardAvoidingView
@@ -308,7 +381,7 @@ export default function ChatThreadScreen() {
                   )}
                   <View style={[styles.msgRow, { justifyContent: mine ? "flex-end" : "flex-start" }]}>
                     <Pressable
-                      onLongPress={() => confirmDelete(m)}
+                      onLongPress={() => (mine ? confirmDelete(m) : report(m.id))}
                       delayLongPress={350}
                       style={[
                         styles.bubble,
@@ -318,7 +391,10 @@ export default function ChatThreadScreen() {
                       ]}
                     >
                       {imgUrl && (
-                        <Pressable onPress={() => Linking.openURL(imgUrl)}>
+                        <Pressable
+                          onPress={() => Linking.openURL(imgUrl)}
+                          onLongPress={() => (mine ? confirmDelete(m) : report(m.id))}
+                        >
                           <Image
                             source={{ uri: imgUrl }}
                             style={styles.msgImage}
@@ -356,58 +432,75 @@ export default function ChatThreadScreen() {
         )}
 
         {/* Yuborish paneli — Telegram uslubida: xabarlar ostidan oqib o'tadigan
-            suzuvchi shisha elementlar (rasm tugmasi, matn pilli, yuborish tugmasi) */}
-        <View
-          style={[
-            styles.composer,
-            { paddingBottom: Math.max(insets.bottom, 10) },
-            !liquidGlass && styles.composerFallback,
-          ]}
-        >
-          <GlassSurface style={styles.attachGlass} fallbackStyle={styles.attachFallback} interactive>
-            <Pressable onPress={pickImage} disabled={uploading} style={styles.circleInner}>
-              {uploading ? (
-                <AnimatedLogo variant="loading" size={19} background={null} foreground={colors.primary} />
-              ) : (
-                <ImagePlus size={19} color={colors.onSurfaceVariant} />
-              )}
-            </Pressable>
-          </GlassSurface>
-          <GlassSurface style={styles.inputGlass} fallbackStyle={styles.inputFallback}>
-            <TextInput
-              value={body}
-              onChangeText={setBody}
-              placeholder={t("chat.input_ph")}
-              placeholderTextColor={colors.outline}
-              multiline
-              maxLength={4000}
-              style={styles.input}
-            />
-          </GlassSurface>
-          <GlassSurface
-            style={styles.sendGlass}
-            fallbackStyle={styles.sendFallback}
-            tintColor={body.trim() ? colors.primary : undefined}
-            interactive
+            suzuvchi shisha elementlar (rasm tugmasi, matn pilli, yuborish tugmasi).
+            Bloklangan mijoz bilan yozishma yopiq — o'rniga blokdan chiqarish paneli */}
+        {blocked ? (
+          <View
+            style={[
+              styles.composer,
+              styles.composerFallback,
+              styles.blockedBar,
+              { paddingBottom: Math.max(insets.bottom, 10) },
+            ]}
           >
-            <Pressable
-              onPress={send}
-              disabled={sending || !body.trim()}
-              style={[styles.circleInner, (!body.trim() || sending) && { opacity: 0.5 }]}
-            >
-              {sending ? (
-                <AnimatedLogo variant="loading" size={17} background={null} foreground={colors.onPrimary} />
-              ) : (
-                <Send
-                  size={17}
-                  // Shishada tint faqat matn borida yonadi — bo'sh holatda ikon xira;
-                  // fallbackda fon doim primary, shuning uchun ikon doim oq
-                  color={!liquidGlass || body.trim() ? colors.onPrimary : colors.onSurfaceVariant}
-                />
-              )}
+            <Text style={styles.blockedText}>{t("mod.blocked_bar")}</Text>
+            <Pressable onPress={toggleBlock} hitSlop={8}>
+              <Text style={[styles.blockedAction, { color: colors.primary }]}>{t("mod.unblock")}</Text>
             </Pressable>
-          </GlassSurface>
-        </View>
+          </View>
+        ) : (
+          <View
+            style={[
+              styles.composer,
+              { paddingBottom: Math.max(insets.bottom, 10) },
+              !liquidGlass && styles.composerFallback,
+            ]}
+          >
+            <GlassSurface style={styles.attachGlass} fallbackStyle={styles.attachFallback} interactive>
+              <Pressable onPress={pickImage} disabled={uploading} style={styles.circleInner}>
+                {uploading ? (
+                  <AnimatedLogo variant="loading" size={19} background={null} foreground={colors.primary} />
+                ) : (
+                  <ImagePlus size={19} color={colors.onSurfaceVariant} />
+                )}
+              </Pressable>
+            </GlassSurface>
+            <GlassSurface style={styles.inputGlass} fallbackStyle={styles.inputFallback}>
+              <TextInput
+                value={body}
+                onChangeText={setBody}
+                placeholder={t("chat.input_ph")}
+                placeholderTextColor={colors.outline}
+                multiline
+                maxLength={4000}
+                style={styles.input}
+              />
+            </GlassSurface>
+            <GlassSurface
+              style={styles.sendGlass}
+              fallbackStyle={styles.sendFallback}
+              tintColor={body.trim() ? colors.primary : undefined}
+              interactive
+            >
+              <Pressable
+                onPress={send}
+                disabled={sending || !body.trim()}
+                style={[styles.circleInner, (!body.trim() || sending) && { opacity: 0.5 }]}
+              >
+                {sending ? (
+                  <AnimatedLogo variant="loading" size={17} background={null} foreground={colors.onPrimary} />
+                ) : (
+                  <Send
+                    size={17}
+                    // Shishada tint faqat matn borida yonadi — bo'sh holatda ikon xira;
+                    // fallbackda fon doim primary, shuning uchun ikon doim oq
+                    color={!liquidGlass || body.trim() ? colors.onPrimary : colors.onSurfaceVariant}
+                  />
+                )}
+              </Pressable>
+            </GlassSurface>
+          </View>
+        )}
       </KeyboardAvoidingView>
     </View>
   );
@@ -478,6 +571,9 @@ const useStyles = makeThemedStyles((colors) => StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.outlineVariant,
   },
+  blockedBar: { alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 14 },
+  blockedText: { flex: 1, fontSize: 13, fontWeight: "600", color: colors.onSurfaceVariant },
+  blockedAction: { fontSize: 13, fontWeight: "800" },
   attachGlass: {
     width: 44,
     height: 44,
