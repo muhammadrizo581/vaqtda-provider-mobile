@@ -42,6 +42,7 @@
   "submit": {
     "production": {
       "ios": {
+        "ascAppId": "6812309883",
         "ascApiKeyPath": "./AuthKey_G6883ZNFMC.p8",
         "ascApiKeyId": "G6883ZNFMC",
         "ascApiKeyIssuerId": "556ed30c-4632-4a54-919b-947143670883"
